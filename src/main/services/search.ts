@@ -1,4 +1,4 @@
-import type { ImageResult } from '@shared/types.js';
+import type { ImageResult, WebSearchResult } from '@shared/types.js';
 import { KEYCHAIN_KEYS } from '@shared/paths.js';
 import { getSecret, setSecret } from '../secrets.js';
 
@@ -9,7 +9,8 @@ interface TavilyImage {
 
 interface TavilyResponse {
   images?: Array<TavilyImage | string>;
-  results?: Array<{ url?: string; title?: string }>;
+  results?: Array<{ url?: string; title?: string; content?: string }>;
+  answer?: string;
 }
 
 const TAVILY_URL = 'https://api.tavily.com/search';
@@ -23,6 +24,36 @@ export class SearchService {
 
   async setSearchKey(key: string): Promise<void> {
     await setSecret(KEYCHAIN_KEYS.searchKey, key);
+  }
+
+  /** Direct Tavily web search — sub-second, ~10x faster than going through Claude's web_search tool. */
+  async web(query: string): Promise<WebSearchResult[]> {
+    const key = await this.getKey();
+    if (!key) {
+      throw new Error('Tavily API key not set. Add it in Settings.');
+    }
+    const r = await fetch(TAVILY_URL, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        api_key: key,
+        query,
+        search_depth: 'basic',
+        max_results: 20,
+        include_answer: false,
+      }),
+    });
+    if (r.status === 401) throw new Error('Tavily API key is invalid.');
+    if (r.status === 429) throw new Error('Tavily rate limit hit; try again later.');
+    if (!r.ok) throw new Error(`Tavily web search failed: ${r.status}`);
+    const j = (await r.json()) as TavilyResponse;
+    return (j.results ?? [])
+      .filter((x) => x.url)
+      .map<WebSearchResult>((x) => ({
+        title: x.title ?? x.url ?? '',
+        url: x.url ?? '',
+        snippet: (x.content ?? '').slice(0, 280),
+      }));
   }
 
   async images(query: string): Promise<ImageResult[]> {

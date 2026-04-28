@@ -112,7 +112,12 @@ async function main(): Promise<void> {
 
   await app.whenReady();
 
-  session.defaultSession.setPermissionRequestHandler((_wc, permission, callback) => {
+  session.defaultSession.setPermissionRequestHandler((wc, permission, callback) => {
+    // Allow microphone in our chrome window so voice mode works; deny everywhere else.
+    if (permission === 'media' && mainWindow && wc === mainWindow.webContents) {
+      callback(true);
+      return;
+    }
     callback(deny(permission));
   });
 
@@ -123,6 +128,7 @@ async function main(): Promise<void> {
   const auth = new AuthService();
   await auth.init();
   const claude = new ClaudeService(auth, settings);
+  // agent tools are wired after tabsService exists below.
   const search = new SearchService();
   const history = new HistoryService();
   const passwords = new PasswordService();
@@ -142,6 +148,19 @@ async function main(): Promise<void> {
 
   mainWindow = await createWindow();
   tabsService = new TabsService(mainWindow, history, settings, PAGE_PRELOAD());
+
+  claude.setAgentTools({
+    openTab: (url, title) => {
+      const tab = tabsService!.create({ mode: 'web', url });
+      if (title) {
+        // The page-title-updated event will overwrite this once the page loads,
+        // but having something descriptive in the strip immediately is nicer.
+        const t = tabsService!.list().find((x) => x.id === tab.id);
+        if (t) t.title = title;
+      }
+    },
+    webSearch: (query) => search.web(query),
+  });
 
   // Restore previous session (URLs only; queries/results don't persist).
   try {
@@ -179,6 +198,7 @@ async function main(): Promise<void> {
 
   // Search
   handle('search:images', (q: string) => search.images(q));
+  handle('search:web', (q: string) => search.web(q));
   handle('search:setSearchKey', (k: string) => search.setSearchKey(k));
 
   // Tabs

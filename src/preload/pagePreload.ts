@@ -64,10 +64,85 @@ async function fillPasswords(): Promise<void> {
     const user = findUserField(form);
     const pw = findPasswordField(form);
     if (!user || !pw) continue;
-    const cred = matches[0]!; // simple v1: pick first; multi-account picker is v1.1
-    nativeSet(user, cred.username);
-    nativeSet(pw, cred.password);
+    if (matches.length === 1) {
+      const cred = matches[0]!;
+      nativeSet(user, cred.username);
+      nativeSet(pw, cred.password);
+    } else {
+      // Multiple accounts — show picker on first focus of either field.
+      const showPicker = (anchor: HTMLInputElement): void =>
+        showPasswordPicker(anchor, matches, (cred) => {
+          nativeSet(user, cred.username);
+          nativeSet(pw, cred.password);
+        });
+      const onFocus = (e: FocusEvent): void => {
+        const t = e.target as HTMLInputElement;
+        if (document.getElementById('claude-browser-pw-pick')) return;
+        showPicker(t);
+      };
+      user.addEventListener('focus', onFocus, { once: true });
+      pw.addEventListener('focus', onFocus, { once: true });
+    }
   }
+}
+
+function showPasswordPicker(
+  anchor: HTMLInputElement,
+  creds: SavedPassword[],
+  onPick: (cred: SavedPassword) => void,
+): void {
+  if (document.getElementById('claude-browser-pw-pick')) return;
+  const rect = anchor.getBoundingClientRect();
+  const host = document.createElement('div');
+  host.id = 'claude-browser-pw-pick';
+  host.attachShadow({ mode: 'open' });
+  const root = host.shadowRoot!;
+  const items = creds
+    .map(
+      (c, i) =>
+        `<button data-i="${i}">
+           <div style="font-weight:500">${escapeHtml(c.username)}</div>
+           <div style="opacity:.6;font-size:11px">${escapeHtml(c.origin)}</div>
+         </button>`,
+    )
+    .join('');
+  root.innerHTML = `
+    <style>
+      .pick {
+        position: fixed; top: ${Math.round(rect.bottom + 4)}px;
+        left: ${Math.round(rect.left)}px; z-index: 2147483647;
+        background: #1a1a1a; color: #fff; padding: 6px;
+        border-radius: 8px; box-shadow: 0 6px 24px rgba(0,0,0,.35);
+        font: 13px system-ui, sans-serif; display: flex; flex-direction: column; gap: 2px;
+        min-width: ${Math.max(220, Math.round(rect.width))}px;
+      }
+      button {
+        background: transparent; color: #fff; border: 0;
+        padding: 8px 10px; text-align: left; cursor: pointer; border-radius: 4px;
+        display: flex; flex-direction: column; gap: 2px;
+      }
+      button:hover { background: #2a2a2a; }
+    </style>
+    <div class="pick">${items}<button data-i="cancel" style="opacity:.6">Cancel</button></div>
+  `;
+  document.body.appendChild(host);
+  root.querySelectorAll('button').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const idx = btn.getAttribute('data-i');
+      host.remove();
+      if (idx === null || idx === 'cancel') return;
+      const cred = creds[Number(idx)];
+      if (cred) onPick(cred);
+    });
+  });
+  // Auto-dismiss on outside click
+  const dismiss = (): void => host.remove();
+  setTimeout(() => document.addEventListener('mousedown', dismiss, { once: true }), 100);
+  setTimeout(() => host.remove(), 15_000);
+}
+
+function escapeHtml(s: string): string {
+  return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
 }
 
 function nativeSet(el: HTMLInputElement, value: string): void {

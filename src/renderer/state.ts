@@ -196,7 +196,7 @@ export const useApp = create<AppState>((set, get) => ({
 
     try {
       if (tab.mode === 'web') {
-        const results = await api.invoke('claude:webSearch', input);
+        const results = await api.invoke('search:web', input);
         set((s) => ({
           ui: { ...s.ui, [id]: { ...(s.ui[id] ?? blankUIState()), webResults: results, webLoading: false } },
         }));

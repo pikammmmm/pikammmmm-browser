@@ -28,6 +28,7 @@ export interface IpcInvoke {
   'claude:chatCancel': (streamId: string) => void;
 
   'search:images': (query: string) => ImageResult[];
+  'search:web': (query: string) => WebSearchResult[];
   'search:setSearchKey': (key: string) => void;
 
   'tab:create': (opts: { mode: TabMode; url?: string }) => Tab;
@@ -109,6 +110,7 @@ export const INVOKE_CHANNELS: Array<keyof IpcInvoke> = [
   'claude:chatStart',
   'claude:chatCancel',
   'search:images',
+  'search:web',
   'search:setSearchKey',
   'tab:create',
   'tab:close',
