@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { copyFileSync, existsSync, readFileSync } from 'node:fs';
+import { copyFileSync, existsSync, readFileSync, readdirSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createDecipheriv } from 'node:crypto';
@@ -16,8 +16,17 @@ function chromeUserDataDir(): string {
   return join(localAppData, 'Google', 'Chrome', 'User Data');
 }
 
-function defaultProfilePath(...rest: string[]): string {
-  return join(chromeUserDataDir(), 'Default', ...rest);
+/** Returns absolute paths to every profile dir (Default + Profile 1..N). */
+function chromeProfileDirs(): string[] {
+  const root = chromeUserDataDir();
+  if (!existsSync(root)) return [];
+  const out: string[] = [];
+  for (const entry of readdirSync(root)) {
+    if (entry === 'Default' || /^Profile \d+$/.test(entry)) {
+      out.push(join(root, entry));
+    }
+  }
+  return out;
 }
 
 function localStatePath(): string {
@@ -82,52 +91,58 @@ function decryptChromePassword(encrypted: Buffer, key: Buffer): string | null {
 export async function importChromePasswords(
   passwords: PasswordService,
 ): Promise<ChromeImportResult> {
-  const src = defaultProfilePath('Login Data');
-  if (!existsSync(src)) {
-    throw new Error('Chrome login DB not found at expected path.');
+  const profiles = chromeProfileDirs();
+  if (profiles.length === 0) {
+    throw new Error('Chrome User Data folder not found.');
   }
   const key = await getChromeMasterKey();
-
-  const tmpDb = join(tmpdir(), `cb-chrome-login-data-${Date.now()}.db`);
-  copyFileSync(src, tmpDb);
-
   let imported = 0;
   let skipped = 0;
-  const db = new Database(tmpDb, { readonly: true });
-  try {
-    const rows = db
-      .prepare(
-        `SELECT origin_url AS url, username_value AS username, password_value AS pw
-         FROM logins
-         WHERE blacklisted_by_user = 0`,
-      )
-      .all() as Array<{ url: string; username: string; pw: Buffer }>;
-    for (const row of rows) {
-      if (!row.url || !row.username || !row.pw || row.pw.length === 0) {
-        skipped++;
-        continue;
-      }
-      const password = decryptChromePassword(row.pw, key);
-      if (!password) {
-        skipped++;
-        continue;
-      }
-      let origin: string;
-      try {
-        origin = new URL(row.url).origin;
-      } catch {
-        skipped++;
-        continue;
-      }
-      try {
-        passwords.save(origin, row.username, password);
-        imported++;
-      } catch {
-        skipped++;
-      }
+  for (const profile of profiles) {
+    const src = join(profile, 'Login Data');
+    if (!existsSync(src)) continue;
+    const tmpDb = join(tmpdir(), `cb-chrome-login-${Date.now()}-${Math.random().toString(36).slice(2)}.db`);
+    try {
+      copyFileSync(src, tmpDb);
+    } catch {
+      continue;
     }
-  } finally {
-    db.close();
+    const db = new Database(tmpDb, { readonly: true });
+    try {
+      const rows = db
+        .prepare(
+          `SELECT origin_url AS url, username_value AS username, password_value AS pw
+           FROM logins
+           WHERE blacklisted_by_user = 0`,
+        )
+        .all() as Array<{ url: string; username: string; pw: Buffer }>;
+      for (const row of rows) {
+        if (!row.url || !row.username || !row.pw || row.pw.length === 0) {
+          skipped++;
+          continue;
+        }
+        const password = decryptChromePassword(row.pw, key);
+        if (!password) {
+          skipped++;
+          continue;
+        }
+        let origin: string;
+        try {
+          origin = new URL(row.url).origin;
+        } catch {
+          skipped++;
+          continue;
+        }
+        try {
+          passwords.save(origin, row.username, password);
+          imported++;
+        } catch {
+          skipped++;
+        }
+      }
+    } finally {
+      db.close();
+    }
   }
   return { imported, skipped };
 }
@@ -230,36 +245,48 @@ export function importPasswordsCsv(
 }
 
 export function importChromeBookmarks(svc: BookmarksService): ChromeImportResult {
-  const path = defaultProfilePath('Bookmarks');
-  if (!existsSync(path)) {
-    throw new Error('Chrome bookmarks file not found.');
+  const profiles = chromeProfileDirs();
+  if (profiles.length === 0) {
+    throw new Error('Chrome User Data folder not found.');
   }
-  const json = JSON.parse(readFileSync(path, 'utf8')) as {
-    roots?: Record<string, ChromeBookmarkNode>;
-  };
   let imported = 0;
   let skipped = 0;
-  const walk = (node: ChromeBookmarkNode, folder: string): void => {
-    if (node.type === 'url' && typeof node.url === 'string') {
-      try {
-        svc.add({ url: node.url, title: node.name ?? '', folder: folder || null });
-        imported++;
-      } catch {
-        skipped++;
-      }
-    } else if (node.type === 'folder' && Array.isArray(node.children)) {
-      const sub = folder ? `${folder}/${node.name ?? ''}` : node.name ?? '';
-      for (const child of node.children) walk(child, sub);
+  let foundFile = false;
+  for (const profile of profiles) {
+    const path = join(profile, 'Bookmarks');
+    if (!existsSync(path)) continue;
+    foundFile = true;
+    const profileName = profile.split(/[\\/]/).pop() ?? '';
+    let json: { roots?: Record<string, ChromeBookmarkNode> };
+    try {
+      json = JSON.parse(readFileSync(path, 'utf8'));
+    } catch {
+      continue;
     }
-  };
-  const roots = json.roots ?? {};
-  for (const rootKey of ['bookmark_bar', 'other', 'synced']) {
-    const root = roots[rootKey];
-    if (!root) continue;
-    const rootName = root.name ?? rootKey;
-    if (Array.isArray(root.children)) {
-      for (const child of root.children) walk(child, rootName);
+    const walk = (node: ChromeBookmarkNode, folder: string): void => {
+      if (node.type === 'url' && typeof node.url === 'string') {
+        try {
+          svc.add({ url: node.url, title: node.name ?? '', folder: folder || null });
+          imported++;
+        } catch {
+          skipped++;
+        }
+      } else if (node.type === 'folder' && Array.isArray(node.children)) {
+        const sub = folder ? `${folder}/${node.name ?? ''}` : node.name ?? '';
+        for (const child of node.children) walk(child, sub);
+      }
+    };
+    const roots = json.roots ?? {};
+    for (const rootKey of ['bookmark_bar', 'other', 'synced']) {
+      const root = roots[rootKey];
+      if (!root) continue;
+      const rootName = root.name ?? rootKey;
+      const topFolder = `${profileName}/${rootName}`;
+      if (Array.isArray(root.children)) {
+        for (const child of root.children) walk(child, topFolder);
+      }
     }
   }
+  if (!foundFile) throw new Error('No Bookmarks file found in any Chrome profile.');
   return { imported, skipped };
 }
