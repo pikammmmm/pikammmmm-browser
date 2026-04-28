@@ -4,6 +4,7 @@ import type {
   Bookmark,
   ChatMessage,
   ChromeImportResult,
+  ChromeProfileInfo,
   HistoryEntry,
   ImageResult,
   SavedCard,
@@ -50,13 +51,14 @@ export interface IpcInvoke {
   'bookmark:list': () => Bookmark[];
   'bookmark:add': (args: { url: string; title: string; folder?: string | null }) => Bookmark;
   'bookmark:delete': (id: string) => void;
-  'bookmark:importChrome': () => ChromeImportResult;
+  'bookmark:importChrome': (profileDir?: string | null) => ChromeImportResult;
+  'chrome:listProfiles': () => ChromeProfileInfo[];
 
   'password:list': () => SavedPassword[];
   'password:save': (args: { origin: string; username: string; password: string }) => void;
   'password:delete': (id: string) => void;
   'password:getForOrigin': (origin: string) => SavedPassword[];
-  'password:importChrome': () => ChromeImportResult;
+  'password:importChrome': (profileDir?: string | null) => ChromeImportResult;
   'password:importCsv': () => ChromeImportResult;
 
   'card:list': () => SavedCard[];
@@ -114,6 +116,7 @@ export const INVOKE_CHANNELS: Array<keyof IpcInvoke> = [
   'bookmark:add',
   'bookmark:delete',
   'bookmark:importChrome',
+  'chrome:listProfiles',
   'password:list',
   'password:save',
   'password:delete',

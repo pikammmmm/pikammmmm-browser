@@ -4,6 +4,7 @@ import { api } from '../api.js';
 import type {
   Bookmark,
   ChromeImportResult,
+  ChromeProfileInfo,
   HistoryEntry,
   SavedCard,
   SavedPassword,
@@ -227,10 +228,28 @@ function PreferencesSection({
   );
 }
 
+function useChromeProfiles(): ChromeProfileInfo[] {
+  const [profiles, setProfiles] = useState<ChromeProfileInfo[]>([]);
+  useEffect(() => {
+    void api
+      .invoke('chrome:listProfiles')
+      .then(setProfiles)
+      .catch(() => setProfiles([]));
+  }, []);
+  return profiles;
+}
+
+function profileLabel(p: ChromeProfileInfo): string {
+  if (p.account) return `${p.account} (${p.dirName})`;
+  return `${p.name} (${p.dirName})`;
+}
+
 function PasswordsSection(): JSX.Element {
   const [items, setItems] = useState<SavedPassword[]>([]);
   const [importing, setImporting] = useState(false);
   const [importMsg, setImportMsg] = useState<string | null>(null);
+  const profiles = useChromeProfiles();
+  const [profileDir, setProfileDir] = useState<string>('');
   const refresh = async (): Promise<void> => {
     setItems(await api.invoke('password:list'));
   };
@@ -242,7 +261,7 @@ function PasswordsSection(): JSX.Element {
     setImporting(true);
     setImportMsg(null);
     try {
-      const r: ChromeImportResult = await api.invoke('password:importChrome');
+      const r: ChromeImportResult = await api.invoke('password:importChrome', profileDir || null);
       setImportMsg(`Imported ${r.imported} (${r.skipped} skipped).`);
       await refresh();
     } catch (e) {
@@ -256,6 +275,14 @@ function PasswordsSection(): JSX.Element {
     <section>
       <h3>Saved passwords ({items.length})</h3>
       <div className="row" style={{ marginBottom: 8 }}>
+        <select value={profileDir} onChange={(e) => setProfileDir(e.target.value)}>
+          <option value="">All profiles</option>
+          {profiles.map((p) => (
+            <option key={p.dir} value={p.dir}>
+              {profileLabel(p)}
+            </option>
+          ))}
+        </select>
         <button className="btn ghost" onClick={importFromChrome} disabled={importing}>
           {importing ? 'Importing…' : 'Import auto (older Chrome)'}
         </button>
@@ -321,6 +348,8 @@ function BookmarksSection(): JSX.Element {
   const [importing, setImporting] = useState(false);
   const [importMsg, setImportMsg] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const profiles = useChromeProfiles();
+  const [profileDir, setProfileDir] = useState<string>('');
 
   const refresh = async (): Promise<void> => {
     setItems(await api.invoke('bookmark:list'));
@@ -333,7 +362,7 @@ function BookmarksSection(): JSX.Element {
     setImporting(true);
     setImportMsg(null);
     try {
-      const r: ChromeImportResult = await api.invoke('bookmark:importChrome');
+      const r: ChromeImportResult = await api.invoke('bookmark:importChrome', profileDir || null);
       setImportMsg(`Imported ${r.imported} (${r.skipped} skipped).`);
       await refresh();
     } catch (e) {
@@ -361,6 +390,16 @@ function BookmarksSection(): JSX.Element {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
+      </div>
+      <div className="row" style={{ marginBottom: 8 }}>
+        <select value={profileDir} onChange={(e) => setProfileDir(e.target.value)}>
+          <option value="">All profiles</option>
+          {profiles.map((p) => (
+            <option key={p.dir} value={p.dir}>
+              {profileLabel(p)}
+            </option>
+          ))}
+        </select>
         <button className="btn ghost" onClick={importFromChrome} disabled={importing}>
           {importing ? 'Importing…' : 'Import from Chrome'}
         </button>

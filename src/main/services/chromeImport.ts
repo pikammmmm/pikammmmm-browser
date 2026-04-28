@@ -5,7 +5,7 @@ import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createDecipheriv } from 'node:crypto';
 import Database from 'better-sqlite3';
-import type { ChromeImportResult } from '@shared/types.js';
+import type { ChromeImportResult, ChromeProfileInfo } from '@shared/types.js';
 import type { PasswordService } from './passwords.js';
 import type { BookmarksService } from './bookmarks.js';
 
@@ -31,6 +31,43 @@ function chromeProfileDirs(): string[] {
 
 function localStatePath(): string {
   return join(chromeUserDataDir(), 'Local State');
+}
+
+interface LocalStateProfileEntry {
+  name?: string;
+  gaia_name?: string;
+  gaia_given_name?: string;
+}
+
+interface LocalStateShape {
+  profile?: { info_cache?: Record<string, LocalStateProfileEntry> };
+  os_crypt?: { encrypted_key?: string };
+}
+
+function readLocalState(): LocalStateShape | null {
+  if (!existsSync(localStatePath())) return null;
+  try {
+    return JSON.parse(readFileSync(localStatePath(), 'utf8')) as LocalStateShape;
+  } catch {
+    return null;
+  }
+}
+
+export function listChromeProfiles(): ChromeProfileInfo[] {
+  const dirs = chromeProfileDirs();
+  const ls = readLocalState();
+  const cache = ls?.profile?.info_cache ?? {};
+  return dirs.map((dir) => {
+    const dirName = dir.split(/[\\/]/).pop() ?? '';
+    const entry = cache[dirName];
+    const account = (entry?.gaia_name?.trim() || entry?.gaia_given_name?.trim()) ?? null;
+    return {
+      dir,
+      dirName,
+      name: entry?.name ?? dirName,
+      account: account || null,
+    };
+  });
 }
 
 /**
@@ -90,10 +127,15 @@ function decryptChromePassword(encrypted: Buffer, key: Buffer): string | null {
 
 export async function importChromePasswords(
   passwords: PasswordService,
+  profileDir?: string | null,
 ): Promise<ChromeImportResult> {
-  const profiles = chromeProfileDirs();
-  if (profiles.length === 0) {
+  const allProfiles = chromeProfileDirs();
+  if (allProfiles.length === 0) {
     throw new Error('Chrome User Data folder not found.');
+  }
+  const profiles = profileDir ? allProfiles.filter((p) => p === profileDir) : allProfiles;
+  if (profiles.length === 0) {
+    throw new Error('Selected Chrome profile not found.');
   }
   const key = await getChromeMasterKey();
   let imported = 0;
@@ -244,11 +286,19 @@ export function importPasswordsCsv(
   return { imported, skipped };
 }
 
-export function importChromeBookmarks(svc: BookmarksService): ChromeImportResult {
-  const profiles = chromeProfileDirs();
-  if (profiles.length === 0) {
+export function importChromeBookmarks(
+  svc: BookmarksService,
+  profileDir?: string | null,
+): ChromeImportResult {
+  const allProfiles = chromeProfileDirs();
+  if (allProfiles.length === 0) {
     throw new Error('Chrome User Data folder not found.');
   }
+  const profiles = profileDir ? allProfiles.filter((p) => p === profileDir) : allProfiles;
+  if (profiles.length === 0) {
+    throw new Error('Selected Chrome profile not found.');
+  }
+  const profilesByName = new Map(listChromeProfiles().map((p) => [p.dir, p.name]));
   let imported = 0;
   let skipped = 0;
   let foundFile = false;
@@ -256,7 +306,7 @@ export function importChromeBookmarks(svc: BookmarksService): ChromeImportResult
     const path = join(profile, 'Bookmarks');
     if (!existsSync(path)) continue;
     foundFile = true;
-    const profileName = profile.split(/[\\/]/).pop() ?? '';
+    const profileName = profilesByName.get(profile) ?? profile.split(/[\\/]/).pop() ?? '';
     let json: { roots?: Record<string, ChromeBookmarkNode> };
     try {
       json = JSON.parse(readFileSync(path, 'utf8'));

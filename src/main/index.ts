@@ -16,6 +16,7 @@ import {
   importChromeBookmarks,
   importChromePasswords,
   importPasswordsCsv,
+  listChromeProfiles,
 } from './services/chromeImport.js';
 import { db, closeDb } from './db.js';
 
@@ -194,7 +195,10 @@ async function main(): Promise<void> {
   handle('password:delete', (id: string) => passwords.delete(id));
   handle('password:getForOrigin', (origin: string) => passwords.getForOrigin(origin));
 
-  handle('password:importChrome', () => importChromePasswords(passwords));
+  handle('password:importChrome', (profileDir?: string | null) =>
+    importChromePasswords(passwords, profileDir ?? null),
+  );
+  handle('chrome:listProfiles', () => listChromeProfiles());
   handle('password:importCsv', async () => {
     if (!mainWindow) throw new Error('Window not ready');
     const r = await dialog.showOpenDialog(mainWindow, {
@@ -213,7 +217,9 @@ async function main(): Promise<void> {
   handle('bookmark:list', () => bookmarks.list());
   handle('bookmark:add', (args: any) => bookmarks.add(args));
   handle('bookmark:delete', (id: string) => bookmarks.delete(id));
-  handle('bookmark:importChrome', () => importChromeBookmarks(bookmarks));
+  handle('bookmark:importChrome', (profileDir?: string | null) =>
+    importChromeBookmarks(bookmarks, profileDir ?? null),
+  );
 
   // Cards
   handle('card:list', () => cards.list());

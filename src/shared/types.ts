@@ -79,6 +79,17 @@ export interface ChromeImportResult {
   skipped: number;
 }
 
+export interface ChromeProfileInfo {
+  /** absolute path to the profile dir */
+  dir: string;
+  /** "Default" or "Profile 1" etc. */
+  dirName: string;
+  /** Chrome's display name for this profile */
+  name: string;
+  /** Gaia (Google account) display name if signed in */
+  account: string | null;
+}
+
 export interface Settings {
   theme: 'system' | 'light' | 'dark';
   defaultMode: TabMode;
