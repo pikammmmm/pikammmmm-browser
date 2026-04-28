@@ -36,10 +36,10 @@ export class SearchService {
       body: JSON.stringify({
         api_key: key,
         query,
-        search_depth: 'basic',
+        search_depth: 'advanced',
         include_images: true,
         include_image_descriptions: true,
-        max_results: 10,
+        max_results: 20,
       }),
     });
     if (r.status === 401) throw new Error('Tavily API key is invalid.');

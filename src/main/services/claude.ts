@@ -50,11 +50,11 @@ export class ClaudeService extends EventEmitter {
       },
       body: JSON.stringify({
         model: this.settings.get().claudeModel,
-        max_tokens: 2048,
+        max_tokens: 4096,
         system:
-          'You are a search engine. Use the web_search tool, then return ONLY a JSON array of the top 8 most relevant results in the form ' +
+          'You are a search engine. Use the web_search tool, then return ONLY a JSON array of the top 20 most relevant results in the form ' +
           '[{"title":"...","url":"...","snippet":"..."}]. No prose, no preamble. JSON only.',
-        tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 3 }],
+        tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 4 }],
         messages: [{ role: 'user', content: query }],
       }),
     });
@@ -99,7 +99,7 @@ export class ClaudeService extends EventEmitter {
         }
       }
     }
-    return out.slice(0, 8);
+    return out.slice(0, 20);
   }
 
   /**

@@ -7,7 +7,7 @@ const DEFAULTS: Settings = {
   defaultMode: 'web',
   adBlockEnabled: true,
   suspendIdleMinutes: 10,
-  claudeModel: process.env.CLAUDE_MODEL ?? 'claude-opus-4-7',
+  claudeModel: process.env.CLAUDE_MODEL ?? 'claude-sonnet-4-6',
 };
 
 let cache: Settings | null = null;
@@ -23,6 +23,10 @@ export class SettingsService {
     }
     try {
       const raw = JSON.parse(readFileSync(path, 'utf8')) as Partial<Settings>;
+      // Migrate stale model default from earlier builds.
+      if (raw.claudeModel === 'claude-opus-4-7') {
+        delete raw.claudeModel;
+      }
       cache = { ...DEFAULTS, ...raw };
     } catch {
       cache = { ...DEFAULTS };
