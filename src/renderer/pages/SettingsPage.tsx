@@ -13,7 +13,7 @@ export function SettingsPage(): JSX.Element {
         <h1>Settings</h1>
 
         <AuthSection signedIn={auth.signedIn} method={auth.method} />
-        <BraveSection />
+        <SearchKeySection />
         <PreferencesSection
           settings={settings}
           onChange={async (patch) => {
@@ -126,34 +126,43 @@ function AuthSection({
   }
 }
 
-function BraveSection(): JSX.Element {
+function SearchKeySection(): JSX.Element {
   const [key, setKey] = useState('');
   const [saved, setSaved] = useState(false);
   return (
     <section>
-      <h3>Brave Search API key (Image mode)</h3>
+      <h3>Tavily API key (Image mode)</h3>
+      <div style={{ color: 'var(--fg-dim)', marginBottom: 10 }}>
+        Free tier (1,000 queries/month, no card). Get a key at{' '}
+        <a href="https://app.tavily.com/home" target="_blank" rel="noreferrer">
+          app.tavily.com
+        </a>
+        .
+      </div>
       <div className="row">
         <input
           type="password"
-          placeholder="Brave API key"
+          placeholder="tvly-..."
           value={key}
           onChange={(e) => setKey(e.target.value)}
-        />
-        <button
-          className="btn"
-          onClick={async () => {
-            await api.invoke('search:setBraveKey', key);
-            setKey('');
-            setSaved(true);
-            setTimeout(() => setSaved(false), 2000);
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') void save();
           }}
-        >
+        />
+        <button className="btn" onClick={() => void save()} disabled={!key}>
           Save
         </button>
       </div>
       {saved ? <div style={{ color: 'var(--fg-dim)' }}>Saved.</div> : null}
     </section>
   );
+
+  async function save(): Promise<void> {
+    await api.invoke('search:setSearchKey', key);
+    setKey('');
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  }
 }
 
 function PreferencesSection({

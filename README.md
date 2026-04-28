@@ -3,7 +3,7 @@
 A desktop web browser where the search/answer engine is **Claude** instead of Google. Three modes share one address bar:
 
 - **Web** — Claude (with its `web_search` tool) returns ranked links; clicking one loads the real webpage in the tab.
-- **Image** — Brave Search API returns image results; clicking opens the source page.
+- **Image** — Tavily API returns image results; clicking opens the source page.
 - **AI** — Claude streams a markdown answer in a chat pane.
 
 Plus the basics: encrypted password manager, encrypted saved-card autofill, browsing history, ad blocker.
@@ -33,13 +33,13 @@ Copy `.env.example` to `.env` and fill in what you have:
 
 ```
 CLAUDE_OAUTH_CLIENT_ID=        # blank → Sign in with Claude is disabled, use API key instead
-BRAVE_API_KEY=                 # optional; can also be set in Settings UI
+TAVILY_API_KEY=                # optional; can also be set in Settings UI
 CLAUDE_MODEL=claude-opus-4-7   # any current Anthropic model id
 ```
 
 If you don't have OAuth set up yet, just skip it: open the app → Settings → paste your `sk-ant-...` API key. Get one at <https://console.anthropic.com/>.
 
-For image mode: get a free Brave Search API key at <https://api.search.brave.com/> (free tier is 2000 queries/month). Paste it in Settings.
+For image mode: get a free Tavily API key at <https://api.search.brave.com/> (free tier is 2000 queries/month). Paste it in Settings.
 
 ## Build a Windows installer
 

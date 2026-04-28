@@ -32,6 +32,6 @@ export const KEYCHAIN_KEYS = {
   oauthRefresh: 'oauth-refresh-token',
   oauthAccess: 'oauth-access-token',
   apiKey: 'anthropic-api-key',
-  braveKey: 'brave-api-key',
+  searchKey: 'tavily-api-key',
   dbKey: 'db-encryption-key',
 } as const;

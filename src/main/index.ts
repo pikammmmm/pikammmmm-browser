@@ -153,7 +153,7 @@ async function main(): Promise<void> {
 
   // Search
   handle('search:images', (q: string) => search.images(q));
-  handle('search:setBraveKey', (k: string) => search.setBraveKey(k));
+  handle('search:setSearchKey', (k: string) => search.setSearchKey(k));
 
   // Tabs
   handle('tab:create', (opts: any) => tabsService!.create(opts));
