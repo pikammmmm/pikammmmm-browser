@@ -39,6 +39,10 @@ export class AuthService extends EventEmitter {
     return this.state;
   }
 
+  oauthConfigured(): boolean {
+    return readOAuthConfig() !== null;
+  }
+
   async signOut(): Promise<void> {
     await deleteSecret(KEYCHAIN_KEYS.oauthRefresh);
     await deleteSecret(KEYCHAIN_KEYS.oauthAccess);

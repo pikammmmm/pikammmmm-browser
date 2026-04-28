@@ -40,6 +40,10 @@ function AuthSection({
 }): JSX.Element {
   const [key, setKey] = useState('');
   const [err, setErr] = useState<string | null>(null);
+  const [oauthOk, setOauthOk] = useState(false);
+  useEffect(() => {
+    void api.invoke('auth:oauthConfigured').then((v) => setOauthOk(Boolean(v)));
+  }, []);
   return (
     <section>
       <h3>Claude account</h3>
@@ -61,21 +65,12 @@ function AuthSection({
         </div>
       ) : (
         <>
-          <div className="row">
-            <button
-              className="btn"
-              onClick={async () => {
-                setErr(null);
-                try {
-                  await api.invoke('auth:start');
-                } catch (e) {
-                  setErr((e as Error).message);
-                }
-              }}
-            >
-              Sign in with Claude
-            </button>
-            <span style={{ color: 'var(--fg-dim)' }}>or paste an API key →</span>
+          <div style={{ color: 'var(--fg-dim)', marginBottom: 10 }}>
+            Paste your Anthropic API key. Get one at{' '}
+            <a href="https://console.anthropic.com/" target="_blank" rel="noreferrer">
+              console.anthropic.com
+            </a>
+            .
           </div>
           <div className="row">
             <input
@@ -83,28 +78,51 @@ function AuthSection({
               placeholder="sk-ant-..."
               value={key}
               onChange={(e) => setKey(e.target.value)}
-            />
-            <button
-              className="btn"
-              onClick={async () => {
-                setErr(null);
-                try {
-                  const a = await api.invoke('auth:setApiKey', key);
-                  useApp.setState({ auth: a });
-                  setKey('');
-                } catch (e) {
-                  setErr((e as Error).message);
-                }
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') void saveKey();
               }}
-            >
+            />
+            <button className="btn" onClick={() => void saveKey()}>
               Save key
             </button>
           </div>
+          {oauthOk ? (
+            <div className="row" style={{ marginTop: 8 }}>
+              <button
+                className="btn ghost"
+                onClick={async () => {
+                  setErr(null);
+                  try {
+                    await api.invoke('auth:start');
+                  } catch (e) {
+                    setErr((e as Error).message);
+                  }
+                }}
+              >
+                Or sign in with Claude account
+              </button>
+            </div>
+          ) : (
+            <div style={{ color: 'var(--fg-dim)', fontSize: 12, marginTop: 8 }}>
+              "Sign in with Claude" requires <code>CLAUDE_OAUTH_CLIENT_ID</code> env var; not configured.
+            </div>
+          )}
           {err ? <div className="banner error">{err}</div> : null}
         </>
       )}
     </section>
   );
+
+  async function saveKey(): Promise<void> {
+    setErr(null);
+    try {
+      const a = await api.invoke('auth:setApiKey', key);
+      useApp.setState({ auth: a });
+      setKey('');
+    } catch (e) {
+      setErr((e as Error).message);
+    }
+  }
 }
 
 function BraveSection(): JSX.Element {

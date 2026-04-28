@@ -138,6 +138,7 @@ async function main(): Promise<void> {
   handle('auth:start', () => auth.startOAuth());
   handle('auth:signOut', () => auth.signOut());
   handle('auth:getState', () => auth.getState());
+  handle('auth:oauthConfigured', () => auth.oauthConfigured());
   handle('auth:setApiKey', (key: string) => auth.setApiKey(key));
 
   // Claude

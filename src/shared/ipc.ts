@@ -17,6 +17,7 @@ export interface IpcInvoke {
   'auth:start': () => void;
   'auth:signOut': () => void;
   'auth:getState': () => AuthState;
+  'auth:oauthConfigured': () => boolean;
   'auth:setApiKey': (key: string) => AuthState;
 
   'claude:webSearch': (query: string) => WebSearchResult[];
@@ -80,6 +81,7 @@ export const INVOKE_CHANNELS: Array<keyof IpcInvoke> = [
   'auth:start',
   'auth:signOut',
   'auth:getState',
+  'auth:oauthConfigured',
   'auth:setApiKey',
   'claude:webSearch',
   'claude:chatStart',
