@@ -20,6 +20,7 @@ win:
     - target: nsis
       arch:
         - x64
+  icon: build/icon.ico
   artifactName: ${productName}-${version}-Setup.${ext}
 
 nsis:
@@ -28,7 +29,10 @@ nsis:
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: always
   createStartMenuShortcut: true
+  installerIcon: build/icon.ico
+  uninstallerIcon: build/icon.ico
+  installerHeaderIcon: build/icon.ico
 
-publish:
-  provider: github
-  releaseType: release
+# Disable auto-update / publish for now — re-add a `publish:` block once you
+# have a GitHub release target or a self-hosted update feed.
+publish: null

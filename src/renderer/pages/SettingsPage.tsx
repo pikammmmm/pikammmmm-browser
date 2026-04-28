@@ -46,7 +46,7 @@ function AuthSection({
   }, []);
   return (
     <section>
-      <h3>Claude account</h3>
+      <h3>{signedIn ? 'Claude account' : 'Sign in'}</h3>
       {signedIn ? (
         <div className="row">
           <div className="grow">
@@ -66,7 +66,7 @@ function AuthSection({
       ) : (
         <>
           <div style={{ color: 'var(--fg-dim)', marginBottom: 10 }}>
-            Paste your Anthropic API key. Get one at{' '}
+            Paste your Anthropic API key to connect Claude. Get one at{' '}
             <a href="https://console.anthropic.com/" target="_blank" rel="noreferrer">
               console.anthropic.com
             </a>
@@ -82,8 +82,8 @@ function AuthSection({
                 if (e.key === 'Enter') void saveKey();
               }}
             />
-            <button className="btn" onClick={() => void saveKey()}>
-              Save key
+            <button className="btn" onClick={() => void saveKey()} disabled={!key}>
+              Sign in
             </button>
           </div>
           {oauthOk ? (
@@ -99,12 +99,13 @@ function AuthSection({
                   }
                 }}
               >
-                Or sign in with Claude account
+                Or sign in with Claude account →
               </button>
             </div>
           ) : (
             <div style={{ color: 'var(--fg-dim)', fontSize: 12, marginTop: 8 }}>
-              "Sign in with Claude" requires <code>CLAUDE_OAUTH_CLIENT_ID</code> env var; not configured.
+              "Sign in with Claude" needs <code>CLAUDE_OAUTH_CLIENT_ID</code> in <code>.env</code>;
+              not configured, so the API-key path is the way in.
             </div>
           )}
           {err ? <div className="banner error">{err}</div> : null}

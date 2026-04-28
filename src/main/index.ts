@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain, session, shell, dialog } from 'electron';
 import { join } from 'node:path';
+import { existsSync } from 'node:fs';
 import { config as loadDotenv } from 'dotenv';
 import { SettingsService } from './services/settings.js';
 import { AuthService } from './services/auth.js';
@@ -29,6 +30,7 @@ const PAGE_PRELOAD = (): string => join(appRoot(), 'out/preload/pagePreload.js')
 const RENDERER_INDEX = (): string => join(appRoot(), 'out/renderer/index.html');
 
 async function createWindow(): Promise<BrowserWindow> {
+  const iconPath = join(appRoot(), 'build/icon.ico');
   const win = new BrowserWindow({
     width: 1400,
     height: 900,
@@ -36,6 +38,7 @@ async function createWindow(): Promise<BrowserWindow> {
     minHeight: 600,
     show: false,
     backgroundColor: '#1a1a1a',
+    icon: existsSync(iconPath) ? iconPath : undefined,
     webPreferences: {
       preload: CHROME_PRELOAD(),
       contextIsolation: true,
