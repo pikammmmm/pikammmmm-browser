@@ -37,7 +37,7 @@ const CHROME_PRELOAD = (): string => join(appRoot(), 'out/preload/chromePreload.
 const PAGE_PRELOAD = (): string => join(appRoot(), 'out/preload/pagePreload.js');
 const RENDERER_INDEX = (): string => join(appRoot(), 'out/renderer/index.html');
 
-async function createWindow(): Promise<BrowserWindow> {
+function createWindow(): BrowserWindow {
   const iconPath = join(appRoot(), 'build/icon.ico');
   const win = new BrowserWindow({
     width: 1400,
@@ -57,16 +57,16 @@ async function createWindow(): Promise<BrowserWindow> {
       webSecurity: true,
     },
   });
-
   win.once('ready-to-show', () => win.show());
+  return win;
+}
 
+async function loadRenderer(win: BrowserWindow): Promise<void> {
   if (RENDERER_DEV_URL) {
     await win.loadURL(RENDERER_DEV_URL);
   } else {
     await win.loadFile(RENDERER_INDEX());
   }
-
-  return win;
 }
 
 function lockExternalNavigation(): void {
@@ -146,7 +146,11 @@ async function main(): Promise<void> {
     console.warn('Adblock init failed:', e);
   });
 
-  mainWindow = await createWindow();
+  // Window is created BEFORE the renderer loads so we can register all IPC
+  // handlers first. Bootstrap on the renderer side fires immediately on mount,
+  // so if loadRenderer ran first the renderer's first invoke calls would race
+  // the handler registration and silently fail.
+  mainWindow = createWindow();
   tabsService = new TabsService(mainWindow, history, settings, PAGE_PRELOAD());
 
   claude.setAgentTools({
@@ -339,11 +343,16 @@ async function main(): Promise<void> {
   // Application menu — accelerators only; menubar hidden via autoHideMenuBar.
   Menu.setApplicationMenu(buildAppMenu(send, tabsService));
 
+  // All handlers + events wired — NOW load the renderer.
+  await loadRenderer(mainWindow);
+
   app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') app.quit();
   });
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) void createWindow();
+  app.on('activate', async () => {
+    if (BrowserWindow.getAllWindows().length === 0 && mainWindow) {
+      await loadRenderer(mainWindow);
+    }
   });
 }
 
