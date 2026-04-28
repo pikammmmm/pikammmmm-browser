@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import { useApp } from '../state.js';
 import { api } from '../api.js';
 import { ModeToggle } from './ModeToggle.js';
-import { startVoiceCapture } from '../voice.js';
 import type { Bookmark } from '@shared/types.js';
 
 export function AddressBar(): JSX.Element {
@@ -23,7 +22,6 @@ export function AddressBar(): JSX.Element {
 
   const [draft, setDraft] = useState('');
   const [bookmarked, setBookmarked] = useState<Bookmark | null>(null);
-  const [listening, setListening] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // refresh bookmark indicator whenever the active URL changes
@@ -145,27 +143,8 @@ export function AddressBar(): JSX.Element {
       >
         ✨
       </button>
-      <button
-        className={`star-btn ${listening ? 'listening' : ''}`}
-        onClick={async () => {
-          if (listening) return;
-          setListening(true);
-          try {
-            const text = await startVoiceCapture();
-            if (text) {
-              await useApp.getState().setMode(tab.id, 'ai');
-              await useApp.getState().submitQuery(tab.id, text);
-            }
-          } catch (e) {
-            alert((e as Error).message);
-          } finally {
-            setListening(false);
-          }
-        }}
-        title="Voice — speak to Claude"
-      >
-        {listening ? '🎙️' : '🎤'}
-      </button>
+      {/* Voice mic only on the homepage; it lives in NewTabPage with proper
+          inline error handling instead of an alert(). */}
     </div>
   );
 }

@@ -44,39 +44,48 @@ export function ChromeFrame(): JSX.Element {
     };
   }, [activeId]);
 
-  // Show/hide the WebContentsView based on what we're rendering.
+  // Show/hide the WebContentsView based on what we're rendering. The shell
+  // covers the pane area whenever the renderer is showing its own UI.
   useEffect(() => {
     if (!activeId || !tab) return;
     if (showSettings) {
       void api.invoke('tab:hide', activeId);
       return;
     }
-    const renderingPane =
-      (tab.mode === 'web' && (tabUI?.query || tabUI?.webResults || !tab.url)) ||
+    const showsRendererPane =
+      (tab.mode === 'web' &&
+        (!!tabUI?.query || !!tabUI?.webResults || !!tabUI?.webError || !tab.url)) ||
       tab.mode === 'image' ||
       tab.mode === 'ai';
-    if (renderingPane) void api.invoke('tab:hide', activeId);
+    if (showsRendererPane) void api.invoke('tab:hide', activeId);
     else void api.invoke('tab:show', activeId);
-  }, [activeId, tab?.mode, tab?.url, tabUI?.query, tabUI?.webResults, showSettings, tab]);
+  }, [activeId, tab?.mode, tab?.url, tabUI?.query, tabUI?.webResults, tabUI?.webError, showSettings, tab]);
+
+  // Show the homepage (centered search bar) for any empty state — not just web.
+  // Otherwise users in image / AI mode see only an empty pane and have to use
+  // the top address bar with no obvious cue.
+  const isEmpty =
+    !tab ||
+    (tab.mode === 'web' && !tab.url && !tabUI?.query && !tabUI?.webResults && !tabUI?.webError) ||
+    (tab.mode === 'image' && !tabUI?.imageResults && !tabUI?.imageError) ||
+    (tab.mode === 'ai' && (tabUI?.aiMessages.length ?? 0) === 0);
 
   return (
     <div className="content" ref={containerRef}>
       <FindBar />
       {showSettings ? (
         <SettingsPage />
-      ) : !tab ? (
+      ) : isEmpty ? (
         <NewTabPage />
-      ) : tab.mode === 'web' ? (
-        tabUI?.query || tabUI?.webResults ? (
+      ) : tab && tab.mode === 'web' ? (
+        tabUI?.query || tabUI?.webResults || tabUI?.webError ? (
           <WebResultsPane tabId={tab.id} />
-        ) : !tab.url ? (
-          <NewTabPage />
         ) : null
-      ) : tab.mode === 'image' ? (
+      ) : tab && tab.mode === 'image' ? (
         <ImageGridPane tabId={tab.id} />
-      ) : (
+      ) : tab ? (
         <AIChatPane tabId={tab.id} />
-      )}
+      ) : null}
     </div>
   );
 }

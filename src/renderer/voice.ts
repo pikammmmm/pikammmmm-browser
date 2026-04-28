@@ -23,19 +23,29 @@ declare global {
   }
 }
 
+export function isVoiceSupported(): boolean {
+  return Boolean(window.SpeechRecognition ?? window.webkitSpeechRecognition);
+}
+
+const ERROR_MESSAGES: Record<string, string> = {
+  'not-allowed': 'Microphone permission was denied. Allow it in your OS settings to use voice mode.',
+  'service-not-allowed':
+    "This Electron build doesn't include the Google Speech API key, so voice transcription isn't available. (This is a known Electron limitation, not a Pikammmmm Browser bug.)",
+  'no-speech': 'No speech detected — try again.',
+  'audio-capture': 'No microphone found.',
+  network: 'Voice transcription needs internet — check your connection.',
+};
+
 /**
  * Start a one-shot voice capture. Resolves with the transcribed text.
- * Throws if the browser/Electron build doesn't include speech recognition.
+ * Throws with a friendly message if the browser/Electron build doesn't
+ * include speech recognition or fails for another reason.
  */
 export function startVoiceCapture(): Promise<string> {
   return new Promise((resolve, reject) => {
     const Ctor = window.SpeechRecognition ?? window.webkitSpeechRecognition;
     if (!Ctor) {
-      reject(
-        new Error(
-          'Voice capture not supported in this Electron build. (Chromium without the Google Speech API key.)',
-        ),
-      );
+      reject(new Error("Voice capture isn't available in this build."));
       return;
     }
     const rec = new Ctor();
@@ -53,7 +63,7 @@ export function startVoiceCapture(): Promise<string> {
     rec.onerror = (event) => {
       if (resolved) return;
       resolved = true;
-      reject(new Error(`Voice capture error: ${event.error}`));
+      reject(new Error(ERROR_MESSAGES[event.error] ?? `Voice error: ${event.error}`));
     };
     rec.onend = () => {
       if (resolved) return;
