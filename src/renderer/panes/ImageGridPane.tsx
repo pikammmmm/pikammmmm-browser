@@ -17,11 +17,16 @@ export function ImageGridPane({ tabId }: { tabId: string }): JSX.Element {
   }
 
   if (ui.imageError) {
+    const isKeyMissing = /tavily.*key|api key/i.test(ui.imageError);
     return (
       <div className="pane">
         <div className="banner error">
-          {ui.imageError}
-          <button onClick={() => ui.query && void submit(tabId, ui.query)}>Retry</button>
+          <div style={{ marginBottom: 8 }}>{ui.imageError}</div>
+          {isKeyMissing ? (
+            <button onClick={() => useApp.getState().toggleSettings(true)}>Open Settings</button>
+          ) : (
+            <button onClick={() => ui.query && void submit(tabId, ui.query)}>Retry</button>
+          )}
         </div>
       </div>
     );

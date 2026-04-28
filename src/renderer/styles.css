@@ -630,4 +630,50 @@ input, textarea {
   max-width: 520px;
   text-align: center;
   line-height: 1.55;
+  font-size: 14px;
 }
+
+.new-tab-hero .big-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: min(720px, 100%);
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 8px 10px 8px 8px;
+  box-shadow: var(--shadow-pop);
+  transition: border-color .12s, box-shadow .12s;
+}
+.new-tab-hero .big-search:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px rgba(103,80,255,.18), var(--shadow-pop);
+}
+.new-tab-hero .big-search input {
+  flex: 1;
+  background: transparent;
+  border: 0;
+  color: var(--fg);
+  font-size: 16px;
+  padding: 10px 4px;
+  outline: none;
+  min-width: 0;
+}
+.new-tab-hero .big-search .mic {
+  background: transparent;
+  border: 0;
+  color: var(--fg-dim);
+  width: 36px; height: 36px;
+  border-radius: 10px;
+  font-size: 16px;
+}
+.new-tab-hero .big-search .mic:hover { background: var(--bg-3); color: var(--fg); }
+.new-tab-hero .big-search .mic.listening {
+  color: #ff6a6a;
+  animation: pulse 1s ease-in-out infinite;
+}
+.new-tab-hero .hint {
+  color: var(--fg-dim);
+  font-size: 12.5px;
+}
+.new-tab-hero .hint a { cursor: pointer; }

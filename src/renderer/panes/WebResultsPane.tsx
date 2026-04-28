@@ -17,11 +17,20 @@ export function WebResultsPane({ tabId }: { tabId: string }): JSX.Element {
   }
 
   if (ui.webError) {
+    const isKeyMissing = /tavily.*key|api key|sign in/i.test(ui.webError);
     return (
       <div className="pane">
         <div className="banner error">
-          {ui.webError}
-          <button onClick={() => ui.query && void submit(tabId, ui.query)}>Retry</button>
+          <div style={{ marginBottom: 8 }}>{ui.webError}</div>
+          {isKeyMissing ? (
+            <button
+              onClick={() => useApp.getState().toggleSettings(true)}
+            >
+              Open Settings
+            </button>
+          ) : (
+            <button onClick={() => ui.query && void submit(tabId, ui.query)}>Retry</button>
+          )}
         </div>
       </div>
     );
