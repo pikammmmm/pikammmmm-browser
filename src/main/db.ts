@@ -71,7 +71,6 @@ CREATE TABLE IF NOT EXISTS bookmarks (
   UNIQUE (url, folder)
 );
 CREATE INDEX IF NOT EXISTS bookmarks_folder_idx ON bookmarks (folder);
-CREATE INDEX IF NOT EXISTS bookmarks_in_bar_idx ON bookmarks (in_bar);
 `;
 
 const MIGRATIONS = [
