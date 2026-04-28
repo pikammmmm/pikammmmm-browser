@@ -97,18 +97,21 @@ export function AddressBar(): JSX.Element {
         className="address-input"
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
+        onFocus={(e) => e.currentTarget.select()}
         onKeyDown={(e) => {
           if (e.key === 'Enter') {
             e.preventDefault();
-            void submit(tab.id, draft);
+            const value = draft;
+            setDraft('');
+            void submit(tab.id, value);
           }
         }}
         placeholder={
           tab.mode === 'web'
-            ? 'Search Claude or enter URL'
+            ? 'Search the web or enter URL'
             : tab.mode === 'image'
               ? 'Search images'
-              : 'Ask Claude anything'
+              : 'Ask Claude — I can also open tabs for you'
         }
         spellCheck={false}
       />

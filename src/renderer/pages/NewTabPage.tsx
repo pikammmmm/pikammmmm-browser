@@ -64,15 +64,18 @@ export function NewTabPage(): JSX.Element {
             ref={inputRef}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
+            onFocus={(e) => e.currentTarget.select()}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && tab) {
                 e.preventDefault();
-                void submit(tab.id, draft);
+                const value = draft;
                 setDraft('');
+                void submit(tab.id, value);
               }
             }}
             placeholder={placeholder}
             spellCheck={false}
+            autoFocus
           />
           <button
             className={`mic ${listening ? 'listening' : ''}`}

@@ -113,13 +113,9 @@ export const useApp = create<AppState>((set, get) => ({
       api.invoke('tab:list'),
     ]);
     set({ auth, settings, tabs });
-    if (tabs.length === 0) {
-      await get().newTab(settings.defaultMode);
-    } else {
-      const id = tabs[0]!.id;
-      set({ activeTabId: id });
-      await api.invoke('tab:show', id);
-    }
+    // Always open a fresh homepage tab on launch (even if there are restored
+    // tabs) so the centered search bar is the user's first surface.
+    await get().newTab(settings.defaultMode);
   },
 
   async newTab(mode?: TabMode) {
@@ -164,7 +160,11 @@ export const useApp = create<AppState>((set, get) => ({
     const input = raw.trim();
     if (!input) return;
     const tab = get().tabs.find((t) => t.id === id);
-    if (!tab) return;
+    if (!tab) {
+      console.error('submitQuery: no tab', id);
+      return;
+    }
+    console.log('submitQuery', { id, mode: tab.mode, input });
 
     if (tab.mode === 'web' && isUrlLike(input)) {
       await get().navigateUrl(id, normalizeUrl(input));
@@ -221,6 +221,7 @@ export const useApp = create<AppState>((set, get) => ({
       }
     } catch (e: unknown) {
       const msg = (e as Error).message ?? 'Request failed';
+      console.error('submitQuery failed:', msg, e);
       set((s) => ({
         ui: {
           ...s.ui,
