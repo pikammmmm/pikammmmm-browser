@@ -11,6 +11,8 @@ import { PasswordService } from './services/passwords.js';
 import { CardService } from './services/cards.js';
 import { AdblockService } from './services/adblock.js';
 import { TabsService } from './services/tabs.js';
+import { BookmarksService } from './services/bookmarks.js';
+import { importChromeBookmarks, importChromePasswords } from './services/chromeImport.js';
 import { db, closeDb } from './db.js';
 
 // best-effort .env load (dev only)
@@ -119,6 +121,7 @@ async function main(): Promise<void> {
   await passwords.init();
   const cards = new CardService();
   await cards.init();
+  const bookmarks = new BookmarksService();
   const adblock = new AdblockService(settings);
 
   // Initialise DB schema before anything queries it.
@@ -186,8 +189,16 @@ async function main(): Promise<void> {
   handle('password:delete', (id: string) => passwords.delete(id));
   handle('password:getForOrigin', (origin: string) => passwords.getForOrigin(origin));
 
+  handle('password:importChrome', () => importChromePasswords(passwords));
+
   // Page-preload-only channels (cleartext password lookup, card fill).
   handle('page:passwordsForOrigin', (origin: string) => passwords.getForOriginCleartext(origin));
+
+  // Bookmarks
+  handle('bookmark:list', () => bookmarks.list());
+  handle('bookmark:add', (args: any) => bookmarks.add(args));
+  handle('bookmark:delete', (id: string) => bookmarks.delete(id));
+  handle('bookmark:importChrome', () => importChromeBookmarks(bookmarks));
 
   // Cards
   handle('card:list', () => cards.list());

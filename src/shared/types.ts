@@ -66,6 +66,19 @@ export interface HistoryEntry {
   visitedAt: number;
 }
 
+export interface Bookmark {
+  id: string;
+  url: string;
+  title: string;
+  folder: string | null;
+  createdAt: number;
+}
+
+export interface ChromeImportResult {
+  imported: number;
+  skipped: number;
+}
+
 export interface Settings {
   theme: 'system' | 'light' | 'dark';
   defaultMode: TabMode;

@@ -51,4 +51,14 @@ CREATE TABLE IF NOT EXISTS cards (
   last_four TEXT NOT NULL,
   updated_at INTEGER NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS bookmarks (
+  id TEXT PRIMARY KEY,
+  url TEXT NOT NULL,
+  title TEXT NOT NULL DEFAULT '',
+  folder TEXT,
+  created_at INTEGER NOT NULL,
+  UNIQUE (url, folder)
+);
+CREATE INDEX IF NOT EXISTS bookmarks_folder_idx ON bookmarks (folder);
 `;

@@ -81,8 +81,8 @@ input, textarea {
 .tabstrip {
   display: flex;
   align-items: stretch;
-  gap: 2px;
-  padding: 6px 8px 0 8px;
+  gap: 1px;
+  padding: 5px 6px 0 6px;
   background: var(--bg);
   overflow-x: auto;
   scrollbar-width: none;
@@ -93,21 +93,26 @@ input, textarea {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 10px;
-  background: var(--bg-2);
-  border-radius: 8px 8px 0 0;
+  padding: 6px 10px;
+  background: transparent;
+  border-radius: 7px 7px 0 0;
   max-width: 200px;
-  min-width: 120px;
-  border: 1px solid var(--border);
+  min-width: 110px;
+  border: 1px solid transparent;
   border-bottom: none;
   cursor: pointer;
-  font-size: 12.5px;
+  font-size: 12px;
   color: var(--fg-dim);
   position: relative;
+}
+.tab:hover {
+  background: var(--bg-2);
+  color: var(--fg);
 }
 .tab.active {
   background: var(--bg-3);
   color: var(--fg);
+  border-color: var(--border);
 }
 .tab .title {
   flex: 1;
@@ -135,14 +140,15 @@ input, textarea {
   color: var(--fg);
 }
 .tab .mode-pill {
-  font-size: 9px;
-  letter-spacing: .5px;
+  font-size: 8.5px;
+  letter-spacing: .4px;
   text-transform: uppercase;
   padding: 1px 4px;
   border-radius: 3px;
   background: var(--accent);
   color: #fff;
-  opacity: .85;
+  opacity: .8;
+  font-weight: 600;
 }
 .tab.image .mode-pill { background: #2a9d8f; }
 .tab.ai .mode-pill { background: #e76f51; }
@@ -175,8 +181,8 @@ input, textarea {
 .bar {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 10px 8px 10px;
+  gap: 6px;
+  padding: 4px 8px 6px 8px;
   background: var(--bg-2);
   border-bottom: 1px solid var(--border);
 }
@@ -188,8 +194,8 @@ input, textarea {
 .bar-nav button {
   background: transparent;
   border: 0;
-  width: 30px;
-  height: 30px;
+  width: 26px;
+  height: 26px;
   border-radius: 6px;
   color: var(--fg-dim);
   font-size: 16px;
@@ -206,20 +212,23 @@ input, textarea {
 .mode-toggle {
   display: flex;
   background: var(--bg-3);
-  border-radius: 8px;
+  border-radius: 7px;
   padding: 2px;
-  gap: 2px;
+  gap: 1px;
 }
 .mode-toggle button {
   background: transparent;
   border: 0;
-  padding: 6px 10px;
-  border-radius: 6px;
+  padding: 4px 9px;
+  border-radius: 5px;
   color: var(--fg-dim);
-  font-size: 12px;
-  letter-spacing: .3px;
+  font-size: 11px;
+  letter-spacing: .25px;
   text-transform: uppercase;
+  font-weight: 500;
+  transition: background .12s, color .12s;
 }
+.mode-toggle button:hover:not(.on) { color: var(--fg); }
 .mode-toggle button.on {
   background: var(--accent);
   color: #fff;
@@ -229,11 +238,12 @@ input, textarea {
   flex: 1;
   background: var(--bg-3);
   border: 1px solid transparent;
-  border-radius: 8px;
-  padding: 8px 12px;
+  border-radius: 7px;
+  padding: 6px 12px;
   color: var(--fg);
   outline: none;
   min-width: 0;
+  transition: border-color .12s, background .12s;
 }
 .address-input:focus {
   border-color: var(--accent);

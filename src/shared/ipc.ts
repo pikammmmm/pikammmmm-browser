@@ -1,7 +1,9 @@
 import type {
   AdblockStats,
   AuthState,
+  Bookmark,
   ChatMessage,
+  ChromeImportResult,
   HistoryEntry,
   ImageResult,
   SavedCard,
@@ -45,10 +47,16 @@ export interface IpcInvoke {
   'history:list': (opts: { search?: string; limit?: number }) => HistoryEntry[];
   'history:clear': () => void;
 
+  'bookmark:list': () => Bookmark[];
+  'bookmark:add': (args: { url: string; title: string; folder?: string | null }) => Bookmark;
+  'bookmark:delete': (id: string) => void;
+  'bookmark:importChrome': () => ChromeImportResult;
+
   'password:list': () => SavedPassword[];
   'password:save': (args: { origin: string; username: string; password: string }) => void;
   'password:delete': (id: string) => void;
   'password:getForOrigin': (origin: string) => SavedPassword[];
+  'password:importChrome': () => ChromeImportResult;
 
   'card:list': () => SavedCard[];
   'card:save': (
@@ -101,10 +109,15 @@ export const INVOKE_CHANNELS: Array<keyof IpcInvoke> = [
   'tab:reload',
   'history:list',
   'history:clear',
+  'bookmark:list',
+  'bookmark:add',
+  'bookmark:delete',
+  'bookmark:importChrome',
   'password:list',
   'password:save',
   'password:delete',
   'password:getForOrigin',
+  'password:importChrome',
   'card:list',
   'card:save',
   'card:delete',

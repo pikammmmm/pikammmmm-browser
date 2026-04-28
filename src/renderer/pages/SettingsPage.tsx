@@ -1,7 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useApp } from '../state.js';
 import { api } from '../api.js';
-import type { HistoryEntry, SavedCard, SavedPassword } from '@shared/types.js';
+import type {
+  Bookmark,
+  ChromeImportResult,
+  HistoryEntry,
+  SavedCard,
+  SavedPassword,
+} from '@shared/types.js';
 
 export function SettingsPage(): JSX.Element {
   const auth = useApp((s) => s.auth);
@@ -23,6 +29,7 @@ export function SettingsPage(): JSX.Element {
           }}
         />
         <PasswordsSection />
+        <BookmarksSection />
         <CardsSection />
         <HistorySection />
         <AdblockSection />
@@ -222,17 +229,42 @@ function PreferencesSection({
 
 function PasswordsSection(): JSX.Element {
   const [items, setItems] = useState<SavedPassword[]>([]);
+  const [importing, setImporting] = useState(false);
+  const [importMsg, setImportMsg] = useState<string | null>(null);
   const refresh = async (): Promise<void> => {
     setItems(await api.invoke('password:list'));
   };
   useEffect(() => {
     void refresh();
   }, []);
+
+  async function importFromChrome(): Promise<void> {
+    setImporting(true);
+    setImportMsg(null);
+    try {
+      const r: ChromeImportResult = await api.invoke('password:importChrome');
+      setImportMsg(`Imported ${r.imported} (${r.skipped} skipped).`);
+      await refresh();
+    } catch (e) {
+      setImportMsg((e as Error).message);
+    } finally {
+      setImporting(false);
+    }
+  }
+
   return (
     <section>
       <h3>Saved passwords ({items.length})</h3>
+      <div className="row" style={{ marginBottom: 8 }}>
+        <button className="btn ghost" onClick={importFromChrome} disabled={importing}>
+          {importing ? 'Importing…' : 'Import from Chrome'}
+        </button>
+        {importMsg ? (
+          <span style={{ color: 'var(--fg-dim)', fontSize: 12 }}>{importMsg}</span>
+        ) : null}
+      </div>
       {items.length === 0 ? (
-        <div style={{ color: 'var(--fg-dim)' }}>No saved passwords yet. Sign in to a site to save one.</div>
+        <div style={{ color: 'var(--fg-dim)' }}>No saved passwords yet. Sign in to a site to save one, or import from Chrome above.</div>
       ) : (
         items.map((p) => (
           <div key={p.id} className="list-row">
@@ -251,6 +283,100 @@ function PasswordsSection(): JSX.Element {
             </button>
           </div>
         ))
+      )}
+    </section>
+  );
+}
+
+function BookmarksSection(): JSX.Element {
+  const [items, setItems] = useState<Bookmark[]>([]);
+  const [importing, setImporting] = useState(false);
+  const [importMsg, setImportMsg] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+
+  const refresh = async (): Promise<void> => {
+    setItems(await api.invoke('bookmark:list'));
+  };
+  useEffect(() => {
+    void refresh();
+  }, []);
+
+  async function importFromChrome(): Promise<void> {
+    setImporting(true);
+    setImportMsg(null);
+    try {
+      const r: ChromeImportResult = await api.invoke('bookmark:importChrome');
+      setImportMsg(`Imported ${r.imported} (${r.skipped} skipped).`);
+      await refresh();
+    } catch (e) {
+      setImportMsg((e as Error).message);
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  const filtered = search
+    ? items.filter(
+        (b) =>
+          b.title.toLowerCase().includes(search.toLowerCase()) ||
+          b.url.toLowerCase().includes(search.toLowerCase()),
+      )
+    : items;
+
+  return (
+    <section>
+      <h3>Bookmarks ({items.length})</h3>
+      <div className="row" style={{ marginBottom: 8 }}>
+        <input
+          type="text"
+          placeholder="Search bookmarks…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+        <button className="btn ghost" onClick={importFromChrome} disabled={importing}>
+          {importing ? 'Importing…' : 'Import from Chrome'}
+        </button>
+      </div>
+      {importMsg ? (
+        <div style={{ color: 'var(--fg-dim)', fontSize: 12, marginBottom: 8 }}>{importMsg}</div>
+      ) : null}
+      {filtered.length === 0 ? (
+        <div style={{ color: 'var(--fg-dim)' }}>
+          {items.length === 0 ? 'No bookmarks yet. Import from Chrome to get started.' : 'No matches.'}
+        </div>
+      ) : (
+        <div style={{ maxHeight: 280, overflow: 'auto' }}>
+          {filtered.map((b) => (
+            <div key={b.id} className="list-row">
+              <div className="grow">
+                <div>{b.title || b.url}</div>
+                <div style={{ color: 'var(--fg-dim)', fontSize: 12 }}>
+                  {b.folder ? `${b.folder} · ` : ''}{b.url}
+                </div>
+              </div>
+              <button
+                className="btn ghost"
+                onClick={() =>
+                  void useApp.getState().newTab('web').then(() => {
+                    const id = useApp.getState().activeTabId;
+                    if (id) void useApp.getState().navigateUrl(id, b.url);
+                  })
+                }
+              >
+                Open
+              </button>
+              <button
+                className="btn danger"
+                onClick={async () => {
+                  await api.invoke('bookmark:delete', b.id);
+                  void refresh();
+                }}
+              >
+                Delete
+              </button>
+            </div>
+          ))}
+        </div>
       )}
     </section>
   );
