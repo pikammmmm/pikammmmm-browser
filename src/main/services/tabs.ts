@@ -1,9 +1,21 @@
 import { EventEmitter } from 'node:events';
 import { randomUUID } from 'node:crypto';
-import { BrowserWindow, WebContentsView, type Rectangle } from 'electron';
+import { BrowserWindow, Menu, WebContentsView, clipboard, type Rectangle } from 'electron';
 import type { Tab, TabMode } from '@shared/types.js';
 import type { HistoryService } from './history.js';
 import type { SettingsService } from './settings.js';
+
+/** http/https + about:blank only. Blocks javascript:, file:, data:, etc. */
+function safeNavUrl(url: string): string | null {
+  try {
+    const u = new URL(url);
+    if (u.protocol === 'http:' || u.protocol === 'https:') return url;
+    if (u.protocol === 'about:' && (u.pathname === '' || u.pathname === 'blank')) return 'about:blank';
+    return null;
+  } catch {
+    return null;
+  }
+}
 
 interface TabState {
   id: string;
@@ -45,6 +57,13 @@ export class TabsService extends EventEmitter {
     return [...this.tabs.values()].map((t) => this.toPublic(t));
   }
 
+  /** Snapshot of currently-open tabs suitable for session restore. */
+  serialize(): Array<{ url: string; mode: TabMode }> {
+    return [...this.tabs.values()]
+      .filter((t) => !!t.url && t.mode === 'web')
+      .map((t) => ({ url: t.url, mode: t.mode }));
+  }
+
   create(opts: { mode: TabMode; url?: string }): Tab {
     const id = randomUUID();
     const state: TabState = {
@@ -61,8 +80,14 @@ export class TabsService extends EventEmitter {
     };
     this.tabs.set(id, state);
     if (opts.url) {
-      this.ensureView(state);
-      state.view!.webContents.loadURL(opts.url);
+      const safe = safeNavUrl(opts.url);
+      if (safe) {
+        this.ensureView(state);
+        state.view!.webContents.loadURL(safe);
+        state.url = safe;
+      } else {
+        state.url = '';
+      }
     }
     return this.toPublic(state);
   }
@@ -82,10 +107,15 @@ export class TabsService extends EventEmitter {
   navigate(tabId: string, url: string): void {
     const t = this.tabs.get(tabId);
     if (!t) return;
+    const safe = safeNavUrl(url);
+    if (!safe) {
+      // Refuse silently; never load javascript:/file:/data: URLs.
+      return;
+    }
     this.ensureView(t);
-    t.url = url;
+    t.url = safe;
     t.loading = true;
-    t.view!.webContents.loadURL(url);
+    t.view!.webContents.loadURL(safe);
     this.emitUpdate(t);
   }
 
@@ -244,12 +274,63 @@ export class TabsService extends EventEmitter {
       this.emitUpdate(t);
     });
     wc.setWindowOpenHandler(({ url }) => {
-      this.create({ mode: 'web', url });
+      const safe = safeNavUrl(url);
+      if (safe) this.create({ mode: 'web', url: safe });
       return { action: 'deny' };
     });
-    // Hard-fail on cert errors (no click-through).
-    wc.on('certificate-error', (e) => {
-      e.preventDefault();
+    // Cert errors hard-fail by default (no listener = Electron rejects).
+    // Calling preventDefault without callback(true) is undefined behaviour.
+    wc.on('context-menu', (_e, params) => {
+      const items: Electron.MenuItemConstructorOptions[] = [];
+      if (params.linkURL) {
+        items.push({
+          label: 'Open Link in New Tab',
+          click: () => {
+            const safe = safeNavUrl(params.linkURL);
+            if (safe) this.create({ mode: 'web', url: safe });
+          },
+        });
+        items.push({
+          label: 'Copy Link Address',
+          click: () => clipboard.writeText(params.linkURL),
+        });
+        items.push({ type: 'separator' });
+      }
+      if (params.mediaType === 'image' && params.srcURL) {
+        items.push({
+          label: 'Open Image in New Tab',
+          click: () => {
+            const safe = safeNavUrl(params.srcURL);
+            if (safe) this.create({ mode: 'web', url: safe });
+          },
+        });
+        items.push({
+          label: 'Copy Image Address',
+          click: () => clipboard.writeText(params.srcURL),
+        });
+        items.push({ type: 'separator' });
+      }
+      if (params.selectionText) {
+        const snippet = params.selectionText.slice(0, 40).trim();
+        items.push({
+          label: `Ask Claude about "${snippet}${params.selectionText.length > 40 ? '…' : ''}"`,
+          click: () => this.emit('contextSearchClaude', params.selectionText),
+        });
+        items.push({ role: 'copy' });
+        items.push({ type: 'separator' });
+      }
+      if (params.isEditable) {
+        items.push({ role: 'cut' });
+        items.push({ role: 'copy' });
+        items.push({ role: 'paste' });
+        items.push({ type: 'separator' });
+      }
+      items.push({ label: 'Back', enabled: wc.navigationHistory.canGoBack(), click: () => wc.navigationHistory.goBack() });
+      items.push({ label: 'Forward', enabled: wc.navigationHistory.canGoForward(), click: () => wc.navigationHistory.goForward() });
+      items.push({ label: 'Reload', click: () => wc.reload() });
+      items.push({ type: 'separator' });
+      items.push({ label: 'Inspect Element', click: () => wc.inspectElement(params.x, params.y) });
+      Menu.buildFromTemplate(items).popup();
     });
   }
 

@@ -65,7 +65,6 @@ export interface IpcInvoke {
   'chrome:listProfiles': () => ChromeProfileInfo[];
 
   'password:list': () => SavedPassword[];
-  'password:save': (args: { origin: string; username: string; password: string }) => void;
   'password:delete': (id: string) => void;
   'password:getForOrigin': (origin: string) => SavedPassword[];
   'password:importChrome': (profileDir?: string | null) => ChromeImportResult;
@@ -97,7 +96,7 @@ export interface IpcEvents {
   'password:savePrompt': { tabId: string; origin: string; username: string };
   'adblock:statsUpdated': AdblockStats;
   'find:result': { tabId: string; activeMatch: number; matches: number };
-  'menu:command': { command: string };
+  'menu:command': { command: string; payload?: unknown };
 }
 
 export const INVOKE_CHANNELS: Array<keyof IpcInvoke> = [
@@ -140,7 +139,6 @@ export const INVOKE_CHANNELS: Array<keyof IpcInvoke> = [
   'bookmark:importChrome',
   'chrome:listProfiles',
   'password:list',
-  'password:save',
   'password:delete',
   'password:getForOrigin',
   'password:importChrome',

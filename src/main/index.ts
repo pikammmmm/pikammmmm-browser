@@ -1,7 +1,8 @@
 import { app, BrowserWindow, ipcMain, Menu, session, shell, dialog } from 'electron';
 import { join } from 'node:path';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { config as loadDotenv } from 'dotenv';
+import { sessionPath } from '@shared/paths.js';
 import { SettingsService } from './services/settings.js';
 import { AuthService } from './services/auth.js';
 import { ClaudeService } from './services/claude.js';
@@ -142,6 +143,21 @@ async function main(): Promise<void> {
   mainWindow = await createWindow();
   tabsService = new TabsService(mainWindow, history, settings, PAGE_PRELOAD());
 
+  // Restore previous session (URLs only; queries/results don't persist).
+  try {
+    if (existsSync(sessionPath())) {
+      const raw = readFileSync(sessionPath(), 'utf8');
+      const restored = JSON.parse(raw) as Array<{ url: string; mode: 'web' | 'image' | 'ai' }>;
+      for (const t of restored) {
+        if (t?.url && (t.mode === 'web' || t.mode === 'image' || t.mode === 'ai')) {
+          tabsService.create({ mode: t.mode, url: t.url });
+        }
+      }
+    }
+  } catch {
+    /* ignore corrupt session file */
+  }
+
   // ---- IPC handlers ----
   const handle = <K extends string>(channel: K, fn: (...args: any[]) => any): void => {
     ipcMain.handle(channel, async (_e, ...args) => fn(...args));
@@ -199,9 +215,6 @@ async function main(): Promise<void> {
 
   // Passwords
   handle('password:list', () => passwords.list());
-  handle('password:save', ({ origin, username, password }: any) =>
-    passwords.save(origin, username, password),
-  );
   handle('password:delete', (id: string) => passwords.delete(id));
   handle('password:getForOrigin', (origin: string) => passwords.getForOrigin(origin));
 
@@ -220,8 +233,24 @@ async function main(): Promise<void> {
     return importPasswordsCsv(passwords, r.filePaths[0]);
   });
 
-  // Page-preload-only channels (cleartext password lookup, card fill).
-  handle('page:passwordsForOrigin', (origin: string) => passwords.getForOriginCleartext(origin));
+  // ↓↓↓ END regular handle() block ↓↓↓
+  // Page-preload-only channels — verify that the calling tab's URL origin
+  // matches the requested origin. Otherwise any page could call
+  // page:passwordsForOrigin('https://gmail.com') and read someone else's
+  // saved Gmail password.
+  ipcMain.handle('page:passwordsForOrigin', (event, origin: string) => {
+    if (callerOrigin(event.sender.getURL()) !== origin) return [];
+    return passwords.getForOriginCleartext(origin);
+  });
+  ipcMain.handle(
+    'page:savePassword',
+    (event, args: { origin: string; username: string; password: string }) => {
+      if (callerOrigin(event.sender.getURL()) !== args.origin) {
+        throw new Error('Origin mismatch');
+      }
+      passwords.save(args.origin, args.username, args.password);
+    },
+  );
 
   // Bookmarks
   handle('bookmark:list', () => bookmarks.list());
@@ -246,8 +275,15 @@ async function main(): Promise<void> {
     return cards.getDecrypted(id);
   };
   handle('card:getDecrypted', (id: string) => gatedDecrypt(id));
-  handle('page:fillCard', (id: string) => gatedDecrypt(id));
-  handle('page:cardsForAutofill', () => cards.list());
+  // page:fillCard is page-side; refuse anywhere outside http(s).
+  ipcMain.handle('page:fillCard', async (event, id: string) => {
+    if (!callerOrigin(event.sender.getURL())) return null;
+    return gatedDecrypt(id);
+  });
+  ipcMain.handle('page:cardsForAutofill', (event) => {
+    if (!callerOrigin(event.sender.getURL())) return [];
+    return cards.list();
+  });
 
   // Settings
   handle('settings:get', () => settings.get());
@@ -275,6 +311,9 @@ async function main(): Promise<void> {
   tabsService.on('updated', (t) => send('tab:updated', t));
   tabsService.on('closed', (id) => send('tab:closed', id));
   tabsService.on('find', (r) => send('find:result', r));
+  tabsService.on('contextSearchClaude', (text: string) =>
+    send('menu:command', { command: 'searchClaude', payload: { text } }),
+  );
   adblock.on('statsUpdated', (s) => send('adblock:statsUpdated', s));
 
   // Application menu — accelerators only; menubar hidden via autoHideMenuBar.
@@ -339,10 +378,23 @@ function buildAppMenu(
       label: 'Tools',
       submenu: [
         { label: 'Summarize Page', accelerator: 'CmdOrCtrl+Shift+S', click: () => sendCmd('summarizePage') },
+        { label: 'Translate Page (English)', accelerator: 'CmdOrCtrl+Shift+T', click: () => sendCmd('translatePage') },
+        { type: 'separator' },
         { label: 'Settings', accelerator: 'CmdOrCtrl+,', click: () => sendCmd('settings') },
       ],
     },
   ]);
+}
+
+/** Returns the http/https origin of a webContents URL, or null for anything else. */
+function callerOrigin(url: string): string | null {
+  try {
+    const u = new URL(url);
+    if (u.protocol === 'http:' || u.protocol === 'https:') return u.origin;
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 async function confirmCardAccess(): Promise<boolean> {
@@ -362,6 +414,13 @@ async function confirmCardAccess(): Promise<boolean> {
 }
 
 app.on('before-quit', () => {
+  try {
+    if (tabsService) {
+      writeFileSync(sessionPath(), JSON.stringify(tabsService.serialize(), null, 2));
+    }
+  } catch {
+    /* best-effort; if it fails, next launch starts blank */
+  }
   tabsService?.dispose();
   closeDb();
 });

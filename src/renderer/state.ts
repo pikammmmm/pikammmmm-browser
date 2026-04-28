@@ -67,6 +67,8 @@ interface AppState {
   toggleSettings: (open?: boolean) => void;
   focusAddressBar: () => void;
   summarizeCurrentPage: () => Promise<void>;
+  translateCurrentPage: (targetLang?: string) => Promise<void>;
+  askClaudeInNewTab: (text: string) => Promise<void>;
 
   // find-in-page
   openFind: () => void;
@@ -296,6 +298,33 @@ export const useApp = create<AppState>((set, get) => ({
       id,
       `Summarize this page in plain English with 5–7 bullet points covering the key claims. Source URL: ${tab.url}\n\n--- PAGE TEXT ---\n${truncated}`,
     );
+  },
+
+  async translateCurrentPage(targetLang = 'English') {
+    const id = get().activeTabId;
+    if (!id) return;
+    const tab = get().tabs.find((t) => t.id === id);
+    if (!tab?.url) return;
+    let text = '';
+    try {
+      text = await api.invoke('tab:getPageText', id);
+    } catch {
+      return;
+    }
+    if (!text) return;
+    const truncated = text.slice(0, 25_000);
+    await get().setMode(id, 'ai');
+    await get().submitQuery(
+      id,
+      `Translate the following page text to ${targetLang}. Keep paragraph structure. Don't translate URLs, code, or names. Source URL: ${tab.url}\n\n--- PAGE TEXT ---\n${truncated}`,
+    );
+  },
+
+  async askClaudeInNewTab(text) {
+    if (!text.trim()) return;
+    await get().newTab('ai');
+    const id = get().activeTabId;
+    if (id) await get().submitQuery(id, text);
   },
 
   openFind() {

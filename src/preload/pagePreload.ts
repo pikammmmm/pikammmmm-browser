@@ -4,7 +4,7 @@ const ALLOWED = new Set([
   'page:passwordsForOrigin',
   'page:cardsForAutofill',
   'page:fillCard',
-  'password:save',
+  'page:savePassword',
 ]);
 
 const api = {
@@ -127,7 +127,7 @@ function offerSaveBanner(origin: string, username: string, password: string): vo
   `;
   root.querySelector('b')!.textContent = username;
   root.getElementById('save')!.addEventListener('click', () => {
-    void api.invoke('password:save', { origin, username, password });
+    void api.invoke('page:savePassword', { origin, username, password });
     host.remove();
   });
   root.getElementById('cancel')!.addEventListener('click', () => host.remove());

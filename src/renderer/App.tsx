@@ -27,7 +27,8 @@ export default function App(): JSX.Element {
       api.on('claude:chatError', ({ streamId, error }) => applyChatError(streamId, error)),
       api.on('auth:changed', (s) => applyAuthChanged(s)),
       api.on('find:result', (r) => useApp.getState().applyFindResult(r)),
-      api.on('menu:command', ({ command }) => {
+      api.on('menu:command', (msg) => {
+        const { command, payload } = msg as { command: string; payload?: { text?: string } };
         const s = useApp.getState();
         switch (command) {
           case 'newTab':
@@ -44,6 +45,12 @@ export default function App(): JSX.Element {
             break;
           case 'summarizePage':
             void s.summarizeCurrentPage();
+            break;
+          case 'translatePage':
+            void s.translateCurrentPage();
+            break;
+          case 'searchClaude':
+            if (payload?.text) void s.askClaudeInNewTab(payload.text);
             break;
           case 'settings':
             s.toggleSettings();

@@ -19,6 +19,10 @@ export function settingsPath(): string {
   return join(userDataDir(), 'settings.json');
 }
 
+export function sessionPath(): string {
+  return join(userDataDir(), 'session.json');
+}
+
 export function filtersDir(): string {
   return ensureDir(join(userDataDir(), 'filters'));
 }
