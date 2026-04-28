@@ -257,11 +257,39 @@ function PasswordsSection(): JSX.Element {
       <h3>Saved passwords ({items.length})</h3>
       <div className="row" style={{ marginBottom: 8 }}>
         <button className="btn ghost" onClick={importFromChrome} disabled={importing}>
-          {importing ? 'Importing…' : 'Import from Chrome'}
+          {importing ? 'Importing…' : 'Import auto (older Chrome)'}
+        </button>
+        <button
+          className="btn ghost"
+          onClick={async () => {
+            setImporting(true);
+            setImportMsg(null);
+            try {
+              const r: ChromeImportResult = await api.invoke('password:importCsv');
+              setImportMsg(
+                r.imported === 0 && r.skipped === 0
+                  ? 'No file selected.'
+                  : `Imported ${r.imported} (${r.skipped} skipped).`,
+              );
+              await refresh();
+            } catch (e) {
+              setImportMsg((e as Error).message);
+            } finally {
+              setImporting(false);
+            }
+          }}
+          disabled={importing}
+        >
+          Import CSV
         </button>
         {importMsg ? (
           <span style={{ color: 'var(--fg-dim)', fontSize: 12 }}>{importMsg}</span>
         ) : null}
+      </div>
+      <div style={{ color: 'var(--fg-dim)', fontSize: 12, marginBottom: 8 }}>
+        Chrome 127+ encrypts passwords with App-Bound Encryption that auto-import can't read.
+        In Chrome go to <code>chrome://password-manager/settings</code> → <b>Export passwords</b>,
+        then click <b>Import CSV</b> above.
       </div>
       {items.length === 0 ? (
         <div style={{ color: 'var(--fg-dim)' }}>No saved passwords yet. Sign in to a site to save one, or import from Chrome above.</div>

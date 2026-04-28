@@ -139,6 +139,96 @@ interface ChromeBookmarkNode {
   children?: ChromeBookmarkNode[];
 }
 
+/** Tiny CSV parser handling double-quoted fields with embedded commas + escaped quotes. */
+function parseCsv(text: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = '';
+  let inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQuotes) {
+      if (c === '"') {
+        if (text[i + 1] === '"') {
+          field += '"';
+          i++;
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        field += c;
+      }
+    } else {
+      if (c === '"') {
+        inQuotes = true;
+      } else if (c === ',') {
+        row.push(field);
+        field = '';
+      } else if (c === '\n' || c === '\r') {
+        if (c === '\r' && text[i + 1] === '\n') i++;
+        row.push(field);
+        field = '';
+        if (row.length > 1 || row[0] !== '') rows.push(row);
+        row = [];
+      } else {
+        field += c;
+      }
+    }
+  }
+  if (field !== '' || row.length > 0) {
+    row.push(field);
+    rows.push(row);
+  }
+  return rows;
+}
+
+/**
+ * Import passwords from a Chrome-exported CSV. The user gets the file from
+ * chrome://password-manager/settings → Export passwords. Header is:
+ * name,url,username,password,note  (note is sometimes absent on older Chrome).
+ */
+export function importPasswordsCsv(
+  svc: PasswordService,
+  csvPath: string,
+): ChromeImportResult {
+  const text = readFileSync(csvPath, 'utf8');
+  const rows = parseCsv(text);
+  if (rows.length < 2) return { imported: 0, skipped: 0 };
+  const header = rows[0]!.map((h) => h.toLowerCase().trim());
+  const urlIdx = header.indexOf('url');
+  const userIdx = header.indexOf('username');
+  const pwIdx = header.indexOf('password');
+  if (urlIdx < 0 || userIdx < 0 || pwIdx < 0) {
+    throw new Error('CSV header must contain url, username, password columns.');
+  }
+  let imported = 0;
+  let skipped = 0;
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i]!;
+    const url = row[urlIdx];
+    const username = row[userIdx];
+    const password = row[pwIdx];
+    if (!url || !username || !password) {
+      skipped++;
+      continue;
+    }
+    let origin: string;
+    try {
+      origin = new URL(url).origin;
+    } catch {
+      skipped++;
+      continue;
+    }
+    try {
+      svc.save(origin, username, password);
+      imported++;
+    } catch {
+      skipped++;
+    }
+  }
+  return { imported, skipped };
+}
+
 export function importChromeBookmarks(svc: BookmarksService): ChromeImportResult {
   const path = defaultProfilePath('Bookmarks');
   if (!existsSync(path)) {

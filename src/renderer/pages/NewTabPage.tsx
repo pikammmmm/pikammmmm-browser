@@ -10,7 +10,7 @@ export function NewTabPage(): JSX.Element {
   return (
     <div className="pane">
       <div className="new-tab-hero">
-        <div className="logo">Claude Browser</div>
+        <div className="logo">Pikammmmm Browser</div>
         <div className="sub">
           {auth.signedIn ? (
             <>Type a query above. <b>Web</b> uses Claude as your search engine, <b>Image</b> searches images, <b>AI</b> chats with Claude directly.</>

@@ -57,6 +57,7 @@ export interface IpcInvoke {
   'password:delete': (id: string) => void;
   'password:getForOrigin': (origin: string) => SavedPassword[];
   'password:importChrome': () => ChromeImportResult;
+  'password:importCsv': () => ChromeImportResult;
 
   'card:list': () => SavedCard[];
   'card:save': (
@@ -118,6 +119,7 @@ export const INVOKE_CHANNELS: Array<keyof IpcInvoke> = [
   'password:delete',
   'password:getForOrigin',
   'password:importChrome',
+  'password:importCsv',
   'card:list',
   'card:save',
   'card:delete',

@@ -217,7 +217,17 @@ export const useApp = create<AppState>((set, get) => ({
 
   async navigateUrl(id, url) {
     set((s) => ({
-      ui: { ...s.ui, [id]: { ...(s.ui[id] ?? blankUIState()), query: null } },
+      ui: {
+        ...s.ui,
+        [id]: {
+          ...(s.ui[id] ?? blankUIState()),
+          query: null,
+          webResults: null,
+          webError: null,
+          imageResults: null,
+          imageError: null,
+        },
+      },
     }));
     await api.invoke('tab:navigate', { tabId: id, url });
     await api.invoke('tab:show', id);

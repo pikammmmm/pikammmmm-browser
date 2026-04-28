@@ -12,7 +12,11 @@ import { CardService } from './services/cards.js';
 import { AdblockService } from './services/adblock.js';
 import { TabsService } from './services/tabs.js';
 import { BookmarksService } from './services/bookmarks.js';
-import { importChromeBookmarks, importChromePasswords } from './services/chromeImport.js';
+import {
+  importChromeBookmarks,
+  importChromePasswords,
+  importPasswordsCsv,
+} from './services/chromeImport.js';
 import { db, closeDb } from './db.js';
 
 // best-effort .env load (dev only)
@@ -39,6 +43,7 @@ async function createWindow(): Promise<BrowserWindow> {
     minWidth: 800,
     minHeight: 600,
     show: false,
+    title: 'Pikammmmm Browser',
     backgroundColor: '#1a1a1a',
     icon: existsSync(iconPath) ? iconPath : undefined,
     webPreferences: {
@@ -190,6 +195,16 @@ async function main(): Promise<void> {
   handle('password:getForOrigin', (origin: string) => passwords.getForOrigin(origin));
 
   handle('password:importChrome', () => importChromePasswords(passwords));
+  handle('password:importCsv', async () => {
+    if (!mainWindow) throw new Error('Window not ready');
+    const r = await dialog.showOpenDialog(mainWindow, {
+      title: 'Import passwords from Chrome CSV',
+      filters: [{ name: 'CSV', extensions: ['csv'] }],
+      properties: ['openFile'],
+    });
+    if (r.canceled || !r.filePaths[0]) return { imported: 0, skipped: 0 };
+    return importPasswordsCsv(passwords, r.filePaths[0]);
+  });
 
   // Page-preload-only channels (cleartext password lookup, card fill).
   handle('page:passwordsForOrigin', (origin: string) => passwords.getForOriginCleartext(origin));
