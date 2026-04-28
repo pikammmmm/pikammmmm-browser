@@ -72,6 +72,7 @@ export interface Bookmark {
   title: string;
   folder: string | null;
   createdAt: number;
+  inBar: boolean;
 }
 
 export interface ChromeImportResult {

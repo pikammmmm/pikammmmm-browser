@@ -6,6 +6,7 @@ import { ImageGridPane } from '../panes/ImageGridPane.js';
 import { AIChatPane } from '../panes/AIChatPane.js';
 import { NewTabPage } from '../pages/NewTabPage.js';
 import { SettingsPage } from '../pages/SettingsPage.js';
+import { FindBar } from './FindBar.js';
 
 /** Wraps the content area; reports its bounds to main so the active WebContentsView can match. */
 export function ChromeFrame(): JSX.Element {
@@ -60,6 +61,7 @@ export function ChromeFrame(): JSX.Element {
 
   return (
     <div className="content" ref={containerRef}>
+      <FindBar />
       {showSettings ? (
         <SettingsPage />
       ) : !tab ? (

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, session, shell, dialog } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu, session, shell, dialog } from 'electron';
 import { join } from 'node:path';
 import { existsSync } from 'node:fs';
 import { config as loadDotenv } from 'dotenv';
@@ -44,6 +44,7 @@ async function createWindow(): Promise<BrowserWindow> {
     minWidth: 800,
     minHeight: 600,
     show: false,
+    autoHideMenuBar: true,
     title: 'Pikammmmm Browser',
     backgroundColor: '#1a1a1a',
     icon: existsSync(iconPath) ? iconPath : undefined,
@@ -182,6 +183,15 @@ async function main(): Promise<void> {
   handle('tab:goBack', (id: string) => tabsService!.goBack(id));
   handle('tab:goForward', (id: string) => tabsService!.goForward(id));
   handle('tab:reload', (id: string) => tabsService!.reload(id));
+  handle('tab:zoomIn', (id: string) => tabsService!.zoomBy(id, 0.1));
+  handle('tab:zoomOut', (id: string) => tabsService!.zoomBy(id, -0.1));
+  handle('tab:zoomReset', (id: string) => tabsService!.zoomReset(id));
+  handle('tab:toggleDevTools', (id: string) => tabsService!.toggleDevTools(id));
+  handle('tab:findInPage', ({ tabId, text, forward }: { tabId: string; text: string; forward?: boolean }) =>
+    tabsService!.findInPage(tabId, text, forward !== false),
+  );
+  handle('tab:stopFindInPage', (id: string) => tabsService!.stopFindInPage(id));
+  handle('tab:getPageText', (id: string) => tabsService!.getPageText(id));
 
   // History
   handle('history:list', (opts: any) => history.list(opts));
@@ -215,7 +225,12 @@ async function main(): Promise<void> {
 
   // Bookmarks
   handle('bookmark:list', () => bookmarks.list());
+  handle('bookmark:listBar', () => bookmarks.listInBar());
+  handle('bookmark:getByUrl', (url: string) => bookmarks.getByUrl(url));
   handle('bookmark:add', (args: any) => bookmarks.add(args));
+  handle('bookmark:setInBar', ({ id, inBar }: { id: string; inBar: boolean }) =>
+    bookmarks.setInBar(id, inBar),
+  );
   handle('bookmark:delete', (id: string) => bookmarks.delete(id));
   handle('bookmark:importChrome', (profileDir?: string | null) =>
     importChromeBookmarks(bookmarks, profileDir ?? null),
@@ -259,7 +274,11 @@ async function main(): Promise<void> {
   claude.on('chatError', (p) => send('claude:chatError', p));
   tabsService.on('updated', (t) => send('tab:updated', t));
   tabsService.on('closed', (id) => send('tab:closed', id));
+  tabsService.on('find', (r) => send('find:result', r));
   adblock.on('statsUpdated', (s) => send('adblock:statsUpdated', s));
+
+  // Application menu — accelerators only; menubar hidden via autoHideMenuBar.
+  Menu.setApplicationMenu(buildAppMenu(send, tabsService));
 
   app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') app.quit();
@@ -267,6 +286,63 @@ async function main(): Promise<void> {
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) void createWindow();
   });
+}
+
+function buildAppMenu(
+  send: <K extends string>(channel: K, payload: unknown) => void,
+  tabs: TabsService,
+): Menu {
+  const sendCmd = (command: string): void => send('menu:command', { command });
+  const onActiveTab = (fn: (id: string) => void): void => {
+    const id = tabs.getActiveId();
+    if (id) fn(id);
+  };
+  return Menu.buildFromTemplate([
+    {
+      label: 'File',
+      submenu: [
+        { label: 'New Tab', accelerator: 'CmdOrCtrl+T', click: () => sendCmd('newTab') },
+        { label: 'Close Tab', accelerator: 'CmdOrCtrl+W', click: () => sendCmd('closeTab') },
+        { type: 'separator' },
+        { role: 'quit' },
+      ],
+    },
+    {
+      label: 'Edit',
+      submenu: [
+        { role: 'undo' },
+        { role: 'redo' },
+        { type: 'separator' },
+        { role: 'cut' },
+        { role: 'copy' },
+        { role: 'paste' },
+        { type: 'separator' },
+        { label: 'Find in Page', accelerator: 'CmdOrCtrl+F', click: () => sendCmd('find') },
+        { label: 'Focus Address Bar', accelerator: 'CmdOrCtrl+L', click: () => sendCmd('focusAddress') },
+      ],
+    },
+    {
+      label: 'View',
+      submenu: [
+        { label: 'Reload', accelerator: 'CmdOrCtrl+R', click: () => onActiveTab((id) => tabs.reload(id)) },
+        { label: 'Reload (force)', accelerator: 'F5', click: () => onActiveTab((id) => tabs.reload(id)) },
+        { type: 'separator' },
+        { label: 'Zoom In', accelerator: 'CmdOrCtrl+=', click: () => onActiveTab((id) => tabs.zoomBy(id, 0.1)) },
+        { label: 'Zoom In (alt)', accelerator: 'CmdOrCtrl+Plus', click: () => onActiveTab((id) => tabs.zoomBy(id, 0.1)) },
+        { label: 'Zoom Out', accelerator: 'CmdOrCtrl+-', click: () => onActiveTab((id) => tabs.zoomBy(id, -0.1)) },
+        { label: 'Reset Zoom', accelerator: 'CmdOrCtrl+0', click: () => onActiveTab((id) => tabs.zoomReset(id)) },
+        { type: 'separator' },
+        { label: 'Toggle DevTools', accelerator: 'F12', click: () => onActiveTab((id) => tabs.toggleDevTools(id)) },
+      ],
+    },
+    {
+      label: 'Tools',
+      submenu: [
+        { label: 'Summarize Page', accelerator: 'CmdOrCtrl+Shift+S', click: () => sendCmd('summarizePage') },
+        { label: 'Settings', accelerator: 'CmdOrCtrl+,', click: () => sendCmd('settings') },
+      ],
+    },
+  ]);
 }
 
 async function confirmCardAccess(): Promise<boolean> {

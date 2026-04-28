@@ -44,12 +44,22 @@ export interface IpcInvoke {
   'tab:goBack': (tabId: string) => void;
   'tab:goForward': (tabId: string) => void;
   'tab:reload': (tabId: string) => void;
+  'tab:zoomIn': (tabId: string) => number;
+  'tab:zoomOut': (tabId: string) => number;
+  'tab:zoomReset': (tabId: string) => number;
+  'tab:toggleDevTools': (tabId: string) => void;
+  'tab:findInPage': (args: { tabId: string; text: string; forward?: boolean }) => void;
+  'tab:stopFindInPage': (tabId: string) => void;
+  'tab:getPageText': (tabId: string) => string;
 
   'history:list': (opts: { search?: string; limit?: number }) => HistoryEntry[];
   'history:clear': () => void;
 
   'bookmark:list': () => Bookmark[];
-  'bookmark:add': (args: { url: string; title: string; folder?: string | null }) => Bookmark;
+  'bookmark:listBar': () => Bookmark[];
+  'bookmark:getByUrl': (url: string) => Bookmark[];
+  'bookmark:add': (args: { url: string; title: string; folder?: string | null; inBar?: boolean }) => Bookmark;
+  'bookmark:setInBar': (args: { id: string; inBar: boolean }) => void;
   'bookmark:delete': (id: string) => void;
   'bookmark:importChrome': (profileDir?: string | null) => ChromeImportResult;
   'chrome:listProfiles': () => ChromeProfileInfo[];
@@ -86,6 +96,8 @@ export interface IpcEvents {
   'claude:chatError': { streamId: string; error: string };
   'password:savePrompt': { tabId: string; origin: string; username: string };
   'adblock:statsUpdated': AdblockStats;
+  'find:result': { tabId: string; activeMatch: number; matches: number };
+  'menu:command': { command: string };
 }
 
 export const INVOKE_CHANNELS: Array<keyof IpcInvoke> = [
@@ -110,10 +122,20 @@ export const INVOKE_CHANNELS: Array<keyof IpcInvoke> = [
   'tab:goBack',
   'tab:goForward',
   'tab:reload',
+  'tab:zoomIn',
+  'tab:zoomOut',
+  'tab:zoomReset',
+  'tab:toggleDevTools',
+  'tab:findInPage',
+  'tab:stopFindInPage',
+  'tab:getPageText',
   'history:list',
   'history:clear',
   'bookmark:list',
+  'bookmark:listBar',
+  'bookmark:getByUrl',
   'bookmark:add',
+  'bookmark:setInBar',
   'bookmark:delete',
   'bookmark:importChrome',
   'chrome:listProfiles',
@@ -142,4 +164,6 @@ export const EVENT_CHANNELS: Array<keyof IpcEvents> = [
   'claude:chatError',
   'password:savePrompt',
   'adblock:statsUpdated',
+  'find:result',
+  'menu:command',
 ];

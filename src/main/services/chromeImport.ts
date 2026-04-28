@@ -313,17 +313,22 @@ export function importChromeBookmarks(
     } catch {
       continue;
     }
-    const walk = (node: ChromeBookmarkNode, folder: string): void => {
+    const walk = (node: ChromeBookmarkNode, folder: string, inBar: boolean): void => {
       if (node.type === 'url' && typeof node.url === 'string') {
         try {
-          svc.add({ url: node.url, title: node.name ?? '', folder: folder || null });
+          svc.add({
+            url: node.url,
+            title: node.name ?? '',
+            folder: folder || null,
+            inBar,
+          });
           imported++;
         } catch {
           skipped++;
         }
       } else if (node.type === 'folder' && Array.isArray(node.children)) {
         const sub = folder ? `${folder}/${node.name ?? ''}` : node.name ?? '';
-        for (const child of node.children) walk(child, sub);
+        for (const child of node.children) walk(child, sub, inBar);
       }
     };
     const roots = json.roots ?? {};
@@ -332,8 +337,9 @@ export function importChromeBookmarks(
       if (!root) continue;
       const rootName = root.name ?? rootKey;
       const topFolder = `${profileName}/${rootName}`;
+      const inBar = rootKey === 'bookmark_bar';
       if (Array.isArray(root.children)) {
-        for (const child of root.children) walk(child, topFolder);
+        for (const child of root.children) walk(child, topFolder, inBar);
       }
     }
   }

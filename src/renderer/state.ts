@@ -37,6 +37,13 @@ const blankUIState = (): TabUIState => ({
   aiError: null,
 });
 
+interface FindState {
+  open: boolean;
+  text: string;
+  active: number;
+  total: number;
+}
+
 interface AppState {
   auth: AuthState;
   settings: Settings | null;
@@ -44,6 +51,8 @@ interface AppState {
   ui: Record<string, TabUIState>;
   activeTabId: string | null;
   showSettings: boolean;
+  addressFocusToken: number;
+  find: FindState;
 
   bootstrap: () => Promise<void>;
   setActive: (id: string) => void;
@@ -56,6 +65,15 @@ interface AppState {
   goForward: (id: string) => void;
   reload: (id: string) => void;
   toggleSettings: (open?: boolean) => void;
+  focusAddressBar: () => void;
+  summarizeCurrentPage: () => Promise<void>;
+
+  // find-in-page
+  openFind: () => void;
+  closeFind: () => void;
+  setFindText: (text: string) => void;
+  findStep: (forward: boolean) => void;
+  applyFindResult: (result: { tabId: string; activeMatch: number; matches: number }) => void;
 
   applyTabUpdate: (tab: Tab) => void;
   applyTabClosed: (id: string) => void;
@@ -83,6 +101,8 @@ export const useApp = create<AppState>((set, get) => ({
   ui: {},
   activeTabId: null,
   showSettings: false,
+  addressFocusToken: 0,
+  find: { open: false, text: '', active: 0, total: 0 },
 
   async bootstrap() {
     const [auth, settings, tabs] = await Promise.all([
@@ -252,6 +272,65 @@ export const useApp = create<AppState>((set, get) => ({
       const id = get().activeTabId;
       if (id) void api.invoke('tab:show', id);
     }
+  },
+
+  focusAddressBar() {
+    set((s) => ({ addressFocusToken: s.addressFocusToken + 1 }));
+  },
+
+  async summarizeCurrentPage() {
+    const id = get().activeTabId;
+    if (!id) return;
+    const tab = get().tabs.find((t) => t.id === id);
+    if (!tab?.url) return;
+    let text = '';
+    try {
+      text = await api.invoke('tab:getPageText', id);
+    } catch {
+      return;
+    }
+    if (!text) return;
+    const truncated = text.slice(0, 30_000);
+    await get().setMode(id, 'ai');
+    await get().submitQuery(
+      id,
+      `Summarize this page in plain English with 5–7 bullet points covering the key claims. Source URL: ${tab.url}\n\n--- PAGE TEXT ---\n${truncated}`,
+    );
+  },
+
+  openFind() {
+    set({ find: { open: true, text: '', active: 0, total: 0 } });
+  },
+
+  closeFind() {
+    const id = get().activeTabId;
+    if (id) void api.invoke('tab:stopFindInPage', id);
+    set({ find: { open: false, text: '', active: 0, total: 0 } });
+  },
+
+  setFindText(text) {
+    set((s) => ({ find: { ...s.find, text } }));
+    const id = get().activeTabId;
+    if (id && text) void api.invoke('tab:findInPage', { tabId: id, text, forward: true });
+    if (!text) {
+      if (id) void api.invoke('tab:stopFindInPage', id);
+      set((s) => ({ find: { ...s.find, active: 0, total: 0 } }));
+    }
+  },
+
+  findStep(forward) {
+    const id = get().activeTabId;
+    const text = get().find.text;
+    if (!id || !text) return;
+    void api.invoke('tab:findInPage', { tabId: id, text, forward });
+  },
+
+  applyFindResult(result) {
+    const id = get().activeTabId;
+    if (id !== result.tabId) return;
+    set((s) => ({
+      find: { ...s.find, active: result.activeMatch, total: result.matches },
+    }));
   },
 
   applyTabUpdate(tab) {

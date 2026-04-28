@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { useApp } from '../state.js';
+import { api } from '../api.js';
 import { ModeToggle } from './ModeToggle.js';
+import type { Bookmark } from '@shared/types.js';
 
 export function AddressBar(): JSX.Element {
   const tabs = useApp((s) => s.tabs);
@@ -12,12 +14,39 @@ export function AddressBar(): JSX.Element {
   const goForward = useApp((s) => s.goForward);
   const reload = useApp((s) => s.reload);
   const showSettings = useApp((s) => s.showSettings);
+  const summarizeCurrentPage = useApp((s) => s.summarizeCurrentPage);
+  const focusToken = useApp((s) => s.addressFocusToken);
 
   const tab = tabs.find((t) => t.id === activeId) ?? null;
   const tabUI = activeId ? ui[activeId] : null;
 
   const [draft, setDraft] = useState('');
+  const [bookmarked, setBookmarked] = useState<Bookmark | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // refresh bookmark indicator whenever the active URL changes
+  useEffect(() => {
+    if (!tab?.url) {
+      setBookmarked(null);
+      return;
+    }
+    let cancelled = false;
+    void api.invoke('bookmark:getByUrl', tab.url).then((list) => {
+      if (cancelled) return;
+      setBookmarked(list[0] ?? null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [tab?.url]);
+
+  // external focus trigger (Ctrl+L from menu)
+  useEffect(() => {
+    if (focusToken > 0 && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [focusToken]);
 
   useEffect(() => {
     if (!tab) {
@@ -81,6 +110,36 @@ export function AddressBar(): JSX.Element {
         }
         spellCheck={false}
       />
+      <button
+        className={`star-btn ${bookmarked ? 'on' : ''}`}
+        onClick={async () => {
+          if (!tab.url) return;
+          if (bookmarked) {
+            await api.invoke('bookmark:delete', bookmarked.id);
+            setBookmarked(null);
+          } else {
+            const created = await api.invoke('bookmark:add', {
+              url: tab.url,
+              title: tab.title || tab.url,
+              folder: null,
+              inBar: true,
+            });
+            setBookmarked(created);
+          }
+        }}
+        title={bookmarked ? 'Remove bookmark' : 'Bookmark this page'}
+        disabled={!tab.url}
+      >
+        {bookmarked ? '★' : '☆'}
+      </button>
+      <button
+        className="star-btn"
+        onClick={() => void summarizeCurrentPage()}
+        title="Summarize this page with Claude"
+        disabled={!tab.url || tab.mode !== 'web'}
+      >
+        ✨
+      </button>
     </div>
   );
 }

@@ -29,6 +29,7 @@ export function SettingsPage(): JSX.Element {
             useApp.setState({ settings: next });
           }}
         />
+        <PasswordGeneratorSection />
         <PasswordsSection />
         <BookmarksSection />
         <CardsSection />
@@ -242,6 +243,92 @@ function useChromeProfiles(): ChromeProfileInfo[] {
 function profileLabel(p: ChromeProfileInfo): string {
   if (p.account) return `${p.account} (${p.dirName})`;
   return `${p.name} (${p.dirName})`;
+}
+
+const PW_ALPHABET = {
+  lower: 'abcdefghijklmnopqrstuvwxyz',
+  upper: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
+  digit: '0123456789',
+  symbol: '!@#$%^&*()-_=+[]{};:,.?/~',
+};
+
+function generatePassword(opts: {
+  length: number;
+  upper: boolean;
+  digit: boolean;
+  symbol: boolean;
+}): string {
+  const charset =
+    PW_ALPHABET.lower +
+    (opts.upper ? PW_ALPHABET.upper : '') +
+    (opts.digit ? PW_ALPHABET.digit : '') +
+    (opts.symbol ? PW_ALPHABET.symbol : '');
+  if (!charset) return '';
+  const arr = new Uint32Array(opts.length);
+  crypto.getRandomValues(arr);
+  let out = '';
+  for (let i = 0; i < opts.length; i++) {
+    out += charset[arr[i]! % charset.length];
+  }
+  return out;
+}
+
+function PasswordGeneratorSection(): JSX.Element {
+  const [length, setLength] = useState(20);
+  const [upper, setUpper] = useState(true);
+  const [digit, setDigit] = useState(true);
+  const [symbol, setSymbol] = useState(true);
+  const [out, setOut] = useState(() => generatePassword({ length: 20, upper: true, digit: true, symbol: true }));
+  const [copied, setCopied] = useState(false);
+
+  const regen = (): void => {
+    setOut(generatePassword({ length, upper, digit, symbol }));
+    setCopied(false);
+  };
+
+  return (
+    <section>
+      <h3>Password generator</h3>
+      <div className="row">
+        <input type="text" value={out} readOnly style={{ fontFamily: 'JetBrains Mono, Consolas, monospace' }} />
+        <button
+          className="btn"
+          onClick={async () => {
+            await navigator.clipboard.writeText(out);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1500);
+          }}
+        >
+          {copied ? 'Copied' : 'Copy'}
+        </button>
+        <button className="btn ghost" onClick={regen}>
+          Regenerate
+        </button>
+      </div>
+      <div className="row" style={{ marginTop: 8, gap: 16, flexWrap: 'wrap' }}>
+        <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          Length
+          <input
+            type="number"
+            min={6}
+            max={64}
+            value={length}
+            onChange={(e) => setLength(Math.max(6, Math.min(64, Number(e.target.value) || 20)))}
+            style={{ width: 60 }}
+          />
+        </label>
+        <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          <input type="checkbox" checked={upper} onChange={(e) => setUpper(e.target.checked)} /> A-Z
+        </label>
+        <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          <input type="checkbox" checked={digit} onChange={(e) => setDigit(e.target.checked)} /> 0-9
+        </label>
+        <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          <input type="checkbox" checked={symbol} onChange={(e) => setSymbol(e.target.checked)} /> !@#$
+        </label>
+      </div>
+    </section>
+  );
 }
 
 function PasswordsSection(): JSX.Element {

@@ -10,6 +10,15 @@ export function db(): Database.Database {
   conn.pragma('synchronous = NORMAL');
   conn.pragma('foreign_keys = ON');
   conn.exec(SCHEMA);
+  // Idempotent migrations — wrapped because they fail with "duplicate column"
+  // on subsequent runs.
+  for (const stmt of MIGRATIONS) {
+    try {
+      conn.exec(stmt);
+    } catch {
+      /* already applied */
+    }
+  }
   dbInstance = conn;
   return conn;
 }
@@ -58,7 +67,14 @@ CREATE TABLE IF NOT EXISTS bookmarks (
   title TEXT NOT NULL DEFAULT '',
   folder TEXT,
   created_at INTEGER NOT NULL,
+  in_bar INTEGER NOT NULL DEFAULT 0,
   UNIQUE (url, folder)
 );
 CREATE INDEX IF NOT EXISTS bookmarks_folder_idx ON bookmarks (folder);
+CREATE INDEX IF NOT EXISTS bookmarks_in_bar_idx ON bookmarks (in_bar);
 `;
+
+const MIGRATIONS = [
+  `ALTER TABLE bookmarks ADD COLUMN in_bar INTEGER NOT NULL DEFAULT 0;`,
+  `CREATE INDEX IF NOT EXISTS bookmarks_in_bar_idx ON bookmarks (in_bar);`,
+];

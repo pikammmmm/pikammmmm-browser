@@ -144,6 +144,66 @@ export class TabsService extends EventEmitter {
     t?.view?.webContents.reload();
   }
 
+  zoomBy(tabId: string, delta: number): number {
+    const t = this.tabs.get(tabId);
+    if (!t?.view) return 1;
+    const next = Math.max(0.25, Math.min(5, t.view.webContents.getZoomFactor() + delta));
+    t.view.webContents.setZoomFactor(next);
+    return next;
+  }
+
+  zoomReset(tabId: string): number {
+    const t = this.tabs.get(tabId);
+    if (!t?.view) return 1;
+    t.view.webContents.setZoomFactor(1);
+    return 1;
+  }
+
+  toggleDevTools(tabId: string): void {
+    const t = this.tabs.get(tabId);
+    if (!t?.view) return;
+    if (t.view.webContents.isDevToolsOpened()) t.view.webContents.closeDevTools();
+    else t.view.webContents.openDevTools({ mode: 'detach' });
+  }
+
+  getActiveId(): string | null {
+    return this.activeId;
+  }
+
+  /** Set up find-in-page + bubble results back via the emitter. */
+  findInPage(tabId: string, text: string, forward = true): void {
+    const t = this.tabs.get(tabId);
+    if (!t?.view || !text) return;
+    const wc = t.view.webContents;
+    if (!this._findHooked.has(tabId)) {
+      this._findHooked.add(tabId);
+      wc.on('found-in-page', (_e, result) => {
+        this.emit('find', {
+          tabId,
+          activeMatch: result.activeMatchOrdinal,
+          matches: result.matches,
+        });
+      });
+    }
+    wc.findInPage(text, { forward, findNext: false });
+  }
+
+  stopFindInPage(tabId: string): void {
+    const t = this.tabs.get(tabId);
+    t?.view?.webContents.stopFindInPage('clearSelection');
+  }
+
+  async getPageText(tabId: string): Promise<string> {
+    const t = this.tabs.get(tabId);
+    if (!t?.view) return '';
+    const text = (await t.view.webContents.executeJavaScript(
+      'document.body.innerText',
+    )) as unknown;
+    return typeof text === 'string' ? text.slice(0, 50_000) : '';
+  }
+
+  private _findHooked = new Set<string>();
+
   private ensureView(t: TabState): void {
     if (t.view) return;
     const view = new WebContentsView({
