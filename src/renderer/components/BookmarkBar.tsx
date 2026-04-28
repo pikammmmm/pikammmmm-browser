@@ -24,10 +24,23 @@ export function BookmarkBar(): JSX.Element | null {
   useEffect(() => {
     void refresh();
     const off = api.on('tab:updated', () => void refresh());
-    return () => off();
+    const onChanged = (): void => void refresh();
+    window.addEventListener('bookmarks-changed', onChanged);
+    return () => {
+      off();
+      window.removeEventListener('bookmarks-changed', onChanged);
+    };
   }, []);
 
-  if (items.length === 0) return null;
+  if (items.length === 0) {
+    return (
+      <div className="bookmark-bar bookmark-bar-empty">
+        <span>
+          No bookmarks yet. Click ☆ on any page to pin it here, or import from Chrome in Settings.
+        </span>
+      </div>
+    );
+  }
 
   return (
     <div className="bookmark-bar">

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useApp } from '../state.js';
 import { api } from '../api.js';
 import { ModeToggle } from './ModeToggle.js';
+import { notifyBookmarksChanged } from '../bookmarkEvents.js';
 import type { Bookmark } from '@shared/types.js';
 
 export function AddressBar(): JSX.Element {
@@ -129,6 +130,7 @@ export function AddressBar(): JSX.Element {
             });
             setBookmarked(created);
           }
+          notifyBookmarksChanged();
         }}
         title={bookmarked ? 'Remove bookmark' : 'Bookmark this page'}
         disabled={!tab.url}

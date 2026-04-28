@@ -23,8 +23,17 @@ declare global {
   }
 }
 
+/**
+ * Web Speech API technically exists in Electron's bundled Chromium, but the
+ * actual transcription service requires Google's API key which Electron does
+ * not ship. Every call ends with a `network` error. Detect Electron and hide
+ * the mic instead of pretending it works.
+ */
 export function isVoiceSupported(): boolean {
-  return Boolean(window.SpeechRecognition ?? window.webkitSpeechRecognition);
+  if (!(window.SpeechRecognition ?? window.webkitSpeechRecognition)) return false;
+  const ua = navigator.userAgent;
+  if (/Electron/.test(ua)) return false;
+  return true;
 }
 
 const ERROR_MESSAGES: Record<string, string> = {

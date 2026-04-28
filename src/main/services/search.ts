@@ -56,21 +56,51 @@ export class SearchService {
       }));
   }
 
+  /**
+   * Image search via 3 parallel Tavily queries with related phrasings, then
+   * deduped. ~3x more images than a single query and roughly the same wall
+   * time (parallel). Uses search_depth:basic — `advanced` is slower and
+   * doesn't return more images for our use case (we want photos, not deep
+   * web crawling).
+   */
   async images(query: string): Promise<ImageResult[]> {
     const key = await this.getKey();
     if (!key) {
       throw new Error('Tavily API key not set. Add it in Settings.');
     }
+    const queries = [query, `${query} photos`, `${query} images`];
+    const settled = await Promise.allSettled(
+      queries.map((q) => this.singleImageQuery(q, key)),
+    );
+    const out: ImageResult[] = [];
+    const seen = new Set<string>();
+    let firstError: Error | null = null;
+    for (const r of settled) {
+      if (r.status === 'rejected') {
+        firstError ??= r.reason as Error;
+        continue;
+      }
+      for (const img of r.value) {
+        if (seen.has(img.thumbnail)) continue;
+        seen.add(img.thumbnail);
+        out.push(img);
+      }
+    }
+    if (out.length === 0 && firstError) throw firstError;
+    return out;
+  }
+
+  private async singleImageQuery(query: string, key: string): Promise<ImageResult[]> {
     const r = await fetch(TAVILY_URL, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         api_key: key,
         query,
-        search_depth: 'advanced',
+        search_depth: 'basic',
         include_images: true,
         include_image_descriptions: true,
-        max_results: 20,
+        max_results: 10,
       }),
     });
     if (r.status === 401) throw new Error('Tavily API key is invalid.');

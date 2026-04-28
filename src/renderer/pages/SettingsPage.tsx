@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useApp } from '../state.js';
 import { api } from '../api.js';
+import { notifyBookmarksChanged } from '../bookmarkEvents.js';
 import type {
   Bookmark,
   ChromeImportResult,
@@ -452,6 +453,7 @@ function BookmarksSection(): JSX.Element {
       const r: ChromeImportResult = await api.invoke('bookmark:importChrome', profileDir || null);
       setImportMsg(`Imported ${r.imported} (${r.skipped} skipped).`);
       await refresh();
+      notifyBookmarksChanged();
     } catch (e) {
       setImportMsg((e as Error).message);
     } finally {
@@ -520,10 +522,22 @@ function BookmarksSection(): JSX.Element {
                 Open
               </button>
               <button
+                className="btn ghost"
+                onClick={async () => {
+                  await api.invoke('bookmark:setInBar', { id: b.id, inBar: !b.inBar });
+                  void refresh();
+                  notifyBookmarksChanged();
+                }}
+                title={b.inBar ? 'Remove from bar' : 'Add to bar'}
+              >
+                {b.inBar ? '★' : '☆'}
+              </button>
+              <button
                 className="btn danger"
                 onClick={async () => {
                   await api.invoke('bookmark:delete', b.id);
                   void refresh();
+                  notifyBookmarksChanged();
                 }}
               >
                 Delete

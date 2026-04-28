@@ -154,14 +154,8 @@ async function main(): Promise<void> {
   tabsService = new TabsService(mainWindow, history, settings, PAGE_PRELOAD());
 
   claude.setAgentTools({
-    openTab: (url, title) => {
-      const tab = tabsService!.create({ mode: 'web', url });
-      if (title) {
-        // The page-title-updated event will overwrite this once the page loads,
-        // but having something descriptive in the strip immediately is nicer.
-        const t = tabsService!.list().find((x) => x.id === tab.id);
-        if (t) t.title = title;
-      }
+    openTab: (url) => {
+      tabsService!.create({ mode: 'web', url });
     },
     webSearch: (query) => search.web(query),
   });

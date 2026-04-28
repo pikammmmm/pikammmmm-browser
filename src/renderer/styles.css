@@ -265,6 +265,12 @@ input, textarea {
   white-space: nowrap;
 }
 .bookmark-bar::-webkit-scrollbar { display: none; }
+.bookmark-bar.bookmark-bar-empty {
+  color: var(--fg-dim);
+  font-size: 11px;
+  padding: 6px 12px;
+  align-items: center;
+}
 .bookmark-bar-item {
   display: flex;
   align-items: center;
