@@ -57,8 +57,10 @@ interface AppState {
   bootstrap: () => Promise<void>;
   setActive: (id: string) => void;
   newTab: (mode?: TabMode) => Promise<void>;
+  newIncognitoTab: () => Promise<void>;
   closeTab: (id: string) => Promise<void>;
   setMode: (id: string, mode: TabMode) => Promise<void>;
+  reorderTabs: (fromId: string, toId: string) => Promise<void>;
   submitQuery: (id: string, raw: string) => Promise<void>;
   navigateUrl: (id: string, url: string) => Promise<void>;
   goBack: (id: string) => void;
@@ -130,6 +132,17 @@ export const useApp = create<AppState>((set, get) => ({
     await api.invoke('tab:show', tab.id);
   },
 
+  async newIncognitoTab() {
+    const tab = await api.invoke('tab:create', { mode: 'web', incognito: true });
+    set((s) => ({
+      tabs: [...s.tabs, tab],
+      ui: { ...s.ui, [tab.id]: blankUIState() },
+      activeTabId: tab.id,
+      showSettings: false,
+    }));
+    await api.invoke('tab:show', tab.id);
+  },
+
   async closeTab(id: string) {
     await api.invoke('tab:close', id);
     set((s) => {
@@ -154,6 +167,20 @@ export const useApp = create<AppState>((set, get) => ({
     set((s) => ({
       tabs: s.tabs.map((t) => (t.id === id ? { ...t, mode } : t)),
     }));
+  },
+
+  async reorderTabs(fromId, toId) {
+    if (fromId === toId) return;
+    set((s) => {
+      const fromIdx = s.tabs.findIndex((t) => t.id === fromId);
+      const toIdx = s.tabs.findIndex((t) => t.id === toId);
+      if (fromIdx < 0 || toIdx < 0) return s;
+      const next = [...s.tabs];
+      const [moved] = next.splice(fromIdx, 1);
+      next.splice(toIdx, 0, moved!);
+      return { tabs: next };
+    });
+    await api.invoke('tab:reorder', { fromId, toId });
   },
 
   async submitQuery(id, raw) {

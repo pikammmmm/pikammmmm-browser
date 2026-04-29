@@ -36,6 +36,10 @@ export interface Tab {
   loading: boolean;
   canGoBack: boolean;
   canGoForward: boolean;
+  pinned: boolean;
+  muted: boolean;
+  audible: boolean;
+  incognito: boolean;
 }
 
 export interface SavedPassword {

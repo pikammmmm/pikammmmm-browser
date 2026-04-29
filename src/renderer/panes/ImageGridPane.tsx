@@ -4,6 +4,13 @@ export function ImageGridPane({ tabId }: { tabId: string }): JSX.Element {
   const ui = useApp((s) => s.ui[tabId]);
   const navigate = useApp((s) => s.navigateUrl);
   const submit = useApp((s) => s.submitQuery);
+  const newTab = useApp((s) => s.newTab);
+
+  const openInNewTab = async (url: string): Promise<void> => {
+    await newTab('web');
+    const id = useApp.getState().activeTabId;
+    if (id) await navigate(id, url);
+  };
 
   if (!ui) return <div className="pane" />;
 
@@ -56,7 +63,19 @@ export function ImageGridPane({ tabId }: { tabId: string }): JSX.Element {
           <div
             key={`${r.page_url}-${i}`}
             className="image-card"
-            onClick={() => void navigate(tabId, r.page_url)}
+            onMouseDown={(e) => {
+              if (e.button === 1) {
+                e.preventDefault();
+                void openInNewTab(r.page_url);
+              }
+            }}
+            onClick={(e) => {
+              if (e.metaKey || e.ctrlKey) {
+                void openInNewTab(r.page_url);
+              } else {
+                void navigate(tabId, r.page_url);
+              }
+            }}
             title={r.title}
           >
             <img src={r.thumbnail} alt={r.title} loading="lazy" />

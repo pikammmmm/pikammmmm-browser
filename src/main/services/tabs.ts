@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events';
 import { randomUUID } from 'node:crypto';
-import { BrowserWindow, Menu, WebContentsView, clipboard, type Rectangle } from 'electron';
+import { BrowserWindow, Menu, WebContentsView, clipboard, session, type Rectangle } from 'electron';
 import type { Tab, TabMode } from '@shared/types.js';
 import type { HistoryService } from './history.js';
 import type { SettingsService } from './settings.js';
@@ -28,12 +28,25 @@ interface TabState {
   loading: boolean;
   lastActiveAt: number;
   bounds: Rectangle | null;
+  pinned: boolean;
+  muted: boolean;
+  audible: boolean;
+  incognito: boolean;
+}
+
+const INCOGNITO_PARTITION = 'incognito-volatile'; // no `persist:` prefix → in-memory
+
+interface ClosedTabSnapshot {
+  url: string;
+  mode: TabMode;
+  pinned: boolean;
 }
 
 export class TabsService extends EventEmitter {
-  private tabs = new Map<string, TabState>();
+  private tabs: Map<string, TabState> = new Map();
   private activeId: string | null = null;
   private suspendInterval: NodeJS.Timeout | null = null;
+  private closeStack: ClosedTabSnapshot[] = [];
 
   constructor(
     private mainWindow: BrowserWindow,
@@ -64,19 +77,23 @@ export class TabsService extends EventEmitter {
       .map((t) => ({ url: t.url, mode: t.mode }));
   }
 
-  create(opts: { mode: TabMode; url?: string }): Tab {
+  create(opts: { mode: TabMode; url?: string; incognito?: boolean }): Tab {
     const id = randomUUID();
     const state: TabState = {
       id,
       view: null,
       mode: opts.mode,
       url: opts.url ?? '',
-      title: opts.url ?? 'New tab',
+      title: opts.url ?? (opts.incognito ? 'Incognito' : 'New tab'),
       favicon: null,
       query: null,
       loading: false,
       lastActiveAt: Date.now(),
       bounds: null,
+      pinned: false,
+      muted: false,
+      audible: false,
+      incognito: !!opts.incognito,
     };
     this.tabs.set(id, state);
     if (opts.url) {
@@ -95,6 +112,12 @@ export class TabsService extends EventEmitter {
   close(tabId: string): void {
     const t = this.tabs.get(tabId);
     if (!t) return;
+    // Push to undo stack only if there's a real URL — empty new-tab pages
+    // aren't worth restoring.
+    if (t.url) {
+      this.closeStack.push({ url: t.url, mode: t.mode, pinned: t.pinned });
+      if (this.closeStack.length > 20) this.closeStack.shift();
+    }
     if (t.view) {
       this.mainWindow.contentView.removeChildView(t.view);
       t.view.webContents.close();
@@ -102,6 +125,44 @@ export class TabsService extends EventEmitter {
     this.tabs.delete(tabId);
     if (this.activeId === tabId) this.activeId = null;
     this.emit('closed', tabId);
+  }
+
+  closeOthers(keepId: string): void {
+    for (const id of [...this.tabs.keys()]) {
+      const t = this.tabs.get(id);
+      if (id !== keepId && t && !t.pinned) this.close(id);
+    }
+  }
+
+  closeToRight(tabId: string): void {
+    const ids = [...this.tabs.keys()];
+    const idx = ids.indexOf(tabId);
+    if (idx < 0) return;
+    for (const id of ids.slice(idx + 1)) {
+      const t = this.tabs.get(id);
+      if (t && !t.pinned) this.close(id);
+    }
+  }
+
+  undoClose(): Tab | null {
+    const last = this.closeStack.pop();
+    if (!last) return null;
+    return this.create({ mode: last.mode, url: last.url });
+  }
+
+  setPinned(tabId: string, pinned: boolean): void {
+    const t = this.tabs.get(tabId);
+    if (!t) return;
+    t.pinned = pinned;
+    this.emitUpdate(t);
+  }
+
+  setMuted(tabId: string, muted: boolean): void {
+    const t = this.tabs.get(tabId);
+    if (!t) return;
+    t.muted = muted;
+    if (t.view) t.view.webContents.setAudioMuted(muted);
+    this.emitUpdate(t);
   }
 
   navigate(tabId: string, url: string): void {
@@ -128,6 +189,18 @@ export class TabsService extends EventEmitter {
     this.emitUpdate(t);
   }
 
+  /** Reorder tabs by moving `fromId` to the position currently held by `toId`. */
+  reorder(fromId: string, toId: string): void {
+    if (fromId === toId) return;
+    const entries = [...this.tabs.entries()];
+    const fromIdx = entries.findIndex(([id]) => id === fromId);
+    const toIdx = entries.findIndex(([id]) => id === toId);
+    if (fromIdx < 0 || toIdx < 0) return;
+    const [moved] = entries.splice(fromIdx, 1);
+    entries.splice(toIdx, 0, moved!);
+    this.tabs = new Map(entries);
+  }
+
   setBounds(tabId: string, bounds: Rectangle): void {
     const t = this.tabs.get(tabId);
     if (!t) return;
@@ -143,8 +216,17 @@ export class TabsService extends EventEmitter {
         this.mainWindow.contentView.removeChildView(other.view);
       }
     }
+    const restoringFromSuspend = !t.view && !!t.url;
     if (t.url) this.ensureView(t);
     if (t.view) {
+      // If we just rebuilt the view after a suspend, the new webContents is
+      // empty. Reload the saved URL so the user gets the page back instead
+      // of about:blank.
+      if (restoringFromSuspend) {
+        t.loading = true;
+        t.view.webContents.loadURL(t.url);
+        this.emitUpdate(t);
+      }
       this.mainWindow.contentView.addChildView(t.view);
       if (t.bounds) t.view.setBounds(t.bounds);
     }
@@ -196,6 +278,11 @@ export class TabsService extends EventEmitter {
     else t.view.webContents.openDevTools({ mode: 'detach' });
   }
 
+  print(tabId: string): void {
+    const t = this.tabs.get(tabId);
+    t?.view?.webContents.print({ silent: false });
+  }
+
   getActiveId(): string | null {
     return this.activeId;
   }
@@ -243,6 +330,9 @@ export class TabsService extends EventEmitter {
         sandbox: true,
         nodeIntegration: false,
         webSecurity: true,
+        // Incognito tabs use an in-memory partition (no `persist:` prefix);
+        // history, cookies, and storage are isolated and discarded on quit.
+        partition: t.incognito ? INCOGNITO_PARTITION : undefined,
       },
     });
     t.view = view;
@@ -258,7 +348,8 @@ export class TabsService extends EventEmitter {
     });
     wc.on('page-title-updated', (_e, title) => {
       t.title = title;
-      this.history.log(t.url, title);
+      // Skip history logging for incognito tabs.
+      if (!t.incognito) this.history.log(t.url, title);
       this.emitUpdate(t);
     });
     wc.on('did-navigate', (_e, url) => {
@@ -271,6 +362,10 @@ export class TabsService extends EventEmitter {
     });
     wc.on('page-favicon-updated', (_e, favicons) => {
       t.favicon = favicons[0] ?? null;
+      this.emitUpdate(t);
+    });
+    wc.on('audio-state-changed', (e) => {
+      t.audible = e.audible;
       this.emitUpdate(t);
     });
     wc.setWindowOpenHandler(({ url }) => {
@@ -362,6 +457,12 @@ export class TabsService extends EventEmitter {
       loading: t.loading,
       canGoBack: t.view?.webContents.navigationHistory.canGoBack() ?? false,
       canGoForward: t.view?.webContents.navigationHistory.canGoForward() ?? false,
+      pinned: t.pinned,
+      muted: t.muted,
+      audible: t.audible,
+      incognito: t.incognito,
     };
   }
 }
+
+void session; // silence unused-import lint when partition isn't referenced inline

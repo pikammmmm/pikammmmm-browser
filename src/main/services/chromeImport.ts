@@ -302,6 +302,7 @@ export function importChromeBookmarks(
   let imported = 0;
   let skipped = 0;
   let foundFile = false;
+  let firstError: Error | null = null;
   for (const profile of profiles) {
     const path = join(profile, 'Bookmarks');
     if (!existsSync(path)) continue;
@@ -323,7 +324,8 @@ export function importChromeBookmarks(
             inBar,
           });
           imported++;
-        } catch {
+        } catch (err) {
+          if (!firstError) firstError = err as Error;
           skipped++;
         }
       } else if (node.type === 'folder' && Array.isArray(node.children)) {
@@ -344,5 +346,11 @@ export function importChromeBookmarks(
     }
   }
   if (!foundFile) throw new Error('No Bookmarks file found in any Chrome profile.');
+  // If everything failed, surface the actual SQLite error so we know why.
+  // Cast: TS can't track the closure assignment to firstError.
+  const err = firstError as Error | null;
+  if (imported === 0 && skipped > 0 && err) {
+    throw new Error(`All ${skipped} bookmarks failed: ${err.message}`);
+  }
   return { imported, skipped };
 }

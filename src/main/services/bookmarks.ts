@@ -66,8 +66,10 @@ export class BookmarksService {
     const folder = args.folder ?? null;
     const inBarVal = args.inBar ? 1 : 0;
     const createdAt = Date.now();
+    // NB: single-quoted '' — SQLite parses double-quoted "" as an identifier
+    // and throws "no such column" on strict_string_quotes builds.
     const existing = db()
-      .prepare('SELECT id FROM bookmarks WHERE url = ? AND IFNULL(folder, "") = IFNULL(?, "")')
+      .prepare("SELECT id FROM bookmarks WHERE url = ? AND IFNULL(folder, '') = IFNULL(?, '')")
       .get(args.url, folder) as { id: string } | undefined;
     if (existing) {
       db()

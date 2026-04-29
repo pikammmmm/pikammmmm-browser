@@ -28,6 +28,12 @@ try {
   /* ignore */
 }
 
+// We rely on the page-preload override of navigator.credentials.get to keep
+// Windows Hello / passkey dialogs from intercepting our content-script
+// picker. Tried disable-features command-line switches here too but some of
+// them (PasswordManagerEnabled, etc.) trip a fatal error in Electron's
+// Chromium, so the JS-side override is the only viable path.
+
 let mainWindow: BrowserWindow | null = null;
 let tabsService: TabsService | null = null;
 
@@ -141,10 +147,33 @@ async function main(): Promise<void> {
   // Initialise DB schema before anything queries it.
   db();
 
-  // Best-effort adblock load — failure should not block startup.
-  adblock.init().catch((e: unknown) => {
+  // Load uBlock Origin Lite as a Chrome extension into the default session.
+  // This is dramatically more effective than the @ghostery/adblocker library
+  // for sites like YouTube — uBOL ships with the same scriptlets and DNR
+  // rules uBlock Origin uses, including the YouTube preroll-skip logic.
+  const ubolPath = app.isPackaged
+    ? join(process.resourcesPath, 'ubol')
+    : join(app.getAppPath(), 'resources/ubol');
+  if (existsSync(ubolPath)) {
+    try {
+      const ext = await session.defaultSession.loadExtension(ubolPath, {
+        allowFileAccess: true,
+      });
+      console.log('[Pikammmmm Browser] uBOL loaded:', ext.name, ext.version);
+    } catch (e) {
+      console.warn('[Pikammmmm Browser] uBOL load failed:', e);
+    }
+  } else {
+    console.warn('[Pikammmmm Browser] uBOL bundle missing at', ubolPath);
+  }
+
+  // Keep the @ghostery/adblocker as a fallback for sessions where the
+  // extension fails (e.g. dev mode without resources copied).
+  try {
+    await adblock.init();
+  } catch (e) {
     console.warn('Adblock init failed:', e);
-  });
+  }
 
   // Window is created BEFORE the renderer loads so we can register all IPC
   // handlers first. Bootstrap on the renderer side fires immediately on mount,
@@ -209,6 +238,18 @@ async function main(): Promise<void> {
   handle('tab:setMode', ({ tabId, mode, query }: { tabId: string; mode: any; query?: any }) =>
     tabsService!.setMode(tabId, mode, query ?? null),
   );
+  handle('tab:reorder', ({ fromId, toId }: { fromId: string; toId: string }) =>
+    tabsService!.reorder(fromId, toId),
+  );
+  handle('tab:setPinned', ({ tabId, pinned }: { tabId: string; pinned: boolean }) =>
+    tabsService!.setPinned(tabId, pinned),
+  );
+  handle('tab:setMuted', ({ tabId, muted }: { tabId: string; muted: boolean }) =>
+    tabsService!.setMuted(tabId, muted),
+  );
+  handle('tab:closeOthers', (id: string) => tabsService!.closeOthers(id));
+  handle('tab:closeToRight', (id: string) => tabsService!.closeToRight(id));
+  handle('tab:undoClose', () => tabsService!.undoClose());
   handle('tab:setBounds', ({ tabId, bounds }: { tabId: string; bounds: any }) =>
     tabsService!.setBounds(tabId, bounds),
   );
@@ -217,6 +258,7 @@ async function main(): Promise<void> {
   handle('tab:goBack', (id: string) => tabsService!.goBack(id));
   handle('tab:goForward', (id: string) => tabsService!.goForward(id));
   handle('tab:reload', (id: string) => tabsService!.reload(id));
+  handle('tab:print', (id: string) => tabsService!.print(id));
   handle('tab:zoomIn', (id: string) => tabsService!.zoomBy(id, 0.1));
   handle('tab:zoomOut', (id: string) => tabsService!.zoomBy(id, -0.1));
   handle('tab:zoomReset', (id: string) => tabsService!.zoomReset(id));
@@ -258,6 +300,9 @@ async function main(): Promise<void> {
   // saved Gmail password.
   ipcMain.handle('page:passwordsForOrigin', (event, origin: string) => {
     if (callerOrigin(event.sender.getURL()) !== origin) return [];
+    // Incognito tabs use a non-persistent session — don't autofill or save
+    // creds for them.
+    if (!event.sender.session.isPersistent()) return [];
     return passwords.getForOriginCleartext(origin);
   });
   ipcMain.handle(
@@ -266,6 +311,7 @@ async function main(): Promise<void> {
       if (callerOrigin(event.sender.getURL()) !== args.origin) {
         throw new Error('Origin mismatch');
       }
+      if (!event.sender.session.isPersistent()) return; // incognito: no save
       passwords.save(args.origin, args.username, args.password);
     },
   );
@@ -364,7 +410,11 @@ function buildAppMenu(
       label: 'File',
       submenu: [
         { label: 'New Tab', accelerator: 'CmdOrCtrl+T', click: () => sendCmd('newTab') },
+        { label: 'New Incognito Tab', accelerator: 'CmdOrCtrl+Shift+N', click: () => sendCmd('newIncognitoTab') },
         { label: 'Close Tab', accelerator: 'CmdOrCtrl+W', click: () => sendCmd('closeTab') },
+        { label: 'Reopen Closed Tab', accelerator: 'CmdOrCtrl+Shift+T', click: () => sendCmd('undoClose') },
+        { type: 'separator' },
+        { label: 'Print…', accelerator: 'CmdOrCtrl+P', click: () => onActiveTab((id) => tabs.print(id)) },
         { type: 'separator' },
         { role: 'quit' },
       ],

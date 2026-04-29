@@ -34,8 +34,14 @@ export default function App(): JSX.Element {
           case 'newTab':
             void s.newTab();
             break;
+          case 'newIncognitoTab':
+            void s.newIncognitoTab();
+            break;
           case 'closeTab':
             if (s.activeTabId) void s.closeTab(s.activeTabId);
+            break;
+          case 'undoClose':
+            void api.invoke('tab:undoClose');
             break;
           case 'find':
             s.openFind();

@@ -6,13 +6,25 @@ import { join } from 'node:path';
 import { filtersDir } from '@shared/paths.js';
 import type { SettingsService } from './settings.js';
 
+// uBlock Origin's curated filter set, plus EasyList. The uBO lists carry
+// scriptlets and cosmetic filters that handle YouTube/Twitch/etc. ads which
+// vanilla EasyList misses entirely (YouTube serves preroll ads from the same
+// origin as the video, so pure URL blocking can't touch them — uBO's
+// scriptlets short-circuit the ad player in JS).
 const FILTER_LISTS = [
   'https://easylist.to/easylist/easylist.txt',
   'https://easylist.to/easylist/easyprivacy.txt',
-  'https://pgl.yoyo.org/adservers/serverlist.php?hostformat=adblockplus&mimetype=plaintext',
+  'https://raw.githubusercontent.com/uBlockOrigin/uAssetsCDN/main/filters/filters.txt',
+  'https://raw.githubusercontent.com/uBlockOrigin/uAssetsCDN/main/filters/badware.txt',
+  'https://raw.githubusercontent.com/uBlockOrigin/uAssetsCDN/main/filters/privacy.txt',
+  'https://raw.githubusercontent.com/uBlockOrigin/uAssetsCDN/main/filters/quick-fixes.txt',
+  'https://raw.githubusercontent.com/uBlockOrigin/uAssetsCDN/main/filters/resource-abuse.txt',
+  'https://raw.githubusercontent.com/uBlockOrigin/uAssetsCDN/main/filters/unbreak.txt',
 ];
 
-const CACHE_FILE = () => join(filtersDir(), 'engine.bin');
+// Bump this when FILTER_LISTS changes so cached engines get re-fetched.
+const CACHE_VERSION = 'v2';
+const CACHE_FILE = () => join(filtersDir(), `engine.${CACHE_VERSION}.bin`);
 const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
 export class AdblockService extends EventEmitter {

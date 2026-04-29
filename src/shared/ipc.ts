@@ -31,11 +31,18 @@ export interface IpcInvoke {
   'search:web': (query: string) => WebSearchResult[];
   'search:setSearchKey': (key: string) => void;
 
-  'tab:create': (opts: { mode: TabMode; url?: string }) => Tab;
+  'tab:create': (opts: { mode: TabMode; url?: string; incognito?: boolean }) => Tab;
+  'tab:print': (tabId: string) => void;
   'tab:close': (tabId: string) => void;
   'tab:list': () => Tab[];
   'tab:navigate': (args: { tabId: string; url: string }) => void;
   'tab:setMode': (args: { tabId: string; mode: TabMode; query?: string | null }) => void;
+  'tab:reorder': (args: { fromId: string; toId: string }) => void;
+  'tab:setPinned': (args: { tabId: string; pinned: boolean }) => void;
+  'tab:setMuted': (args: { tabId: string; muted: boolean }) => void;
+  'tab:closeOthers': (tabId: string) => void;
+  'tab:closeToRight': (tabId: string) => void;
+  'tab:undoClose': () => void;
   'tab:setBounds': (args: {
     tabId: string;
     bounds: { x: number; y: number; width: number; height: number };
@@ -113,10 +120,17 @@ export const INVOKE_CHANNELS: Array<keyof IpcInvoke> = [
   'search:web',
   'search:setSearchKey',
   'tab:create',
+  'tab:print',
   'tab:close',
   'tab:list',
   'tab:navigate',
   'tab:setMode',
+  'tab:reorder',
+  'tab:setPinned',
+  'tab:setMuted',
+  'tab:closeOthers',
+  'tab:closeToRight',
+  'tab:undoClose',
   'tab:setBounds',
   'tab:show',
   'tab:hide',

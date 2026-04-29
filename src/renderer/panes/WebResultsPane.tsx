@@ -4,6 +4,13 @@ export function WebResultsPane({ tabId }: { tabId: string }): JSX.Element {
   const ui = useApp((s) => s.ui[tabId]);
   const navigate = useApp((s) => s.navigateUrl);
   const submit = useApp((s) => s.submitQuery);
+  const newTab = useApp((s) => s.newTab);
+
+  const openInNewTab = async (url: string): Promise<void> => {
+    await newTab('web');
+    const id = useApp.getState().activeTabId;
+    if (id) await navigate(id, url);
+  };
 
   if (!ui) return <div className="pane" />;
 
@@ -52,7 +59,19 @@ export function WebResultsPane({ tabId }: { tabId: string }): JSX.Element {
           <div
             key={r.url}
             className="result-card"
-            onClick={() => void navigate(tabId, r.url)}
+            onMouseDown={(e) => {
+              if (e.button === 1) {
+                e.preventDefault();
+                void openInNewTab(r.url);
+              }
+            }}
+            onClick={(e) => {
+              if (e.metaKey || e.ctrlKey) {
+                void openInNewTab(r.url);
+              } else {
+                void navigate(tabId, r.url);
+              }
+            }}
           >
             <div className="url">{r.url}</div>
             <div className="title">{r.title}</div>
