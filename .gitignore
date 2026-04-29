@@ -1,7 +1,4 @@
 node_modules/
-out/
-dist/
-dist-android/
 *.log
 .env
 .env.local

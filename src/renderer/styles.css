@@ -76,13 +76,26 @@ input, textarea {
 .tabstrip {
   display: flex;
   align-items: stretch;
-  gap: 1px;
   padding: 5px 6px 0 6px;
   background: var(--bg);
+  gap: 4px;
+}
+.tabstrip-scroll {
+  display: flex;
+  align-items: stretch;
+  gap: 1px;
+  flex: 1;
+  min-width: 0;
   overflow-x: auto;
   scrollbar-width: none;
 }
-.tabstrip::-webkit-scrollbar { display: none; }
+.tabstrip-scroll::-webkit-scrollbar { display: none; }
+.tabstrip-actions {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  flex: 0 0 auto;
+}
 
 .tab {
   display: flex;
@@ -490,19 +503,40 @@ input, textarea {
   background: var(--bg-3);
   transform: translateY(-1px);
 }
-.result-card .url {
+.result-card .result-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
   color: var(--fg-dim);
   font-size: 12px;
-  margin-bottom: 4px;
+  min-width: 0;
+}
+.result-card .result-favicon {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
+  border-radius: 3px;
+  background: var(--bg-3);
+}
+.result-card .result-host {
+  color: var(--fg);
+  font-weight: 500;
+  white-space: nowrap;
+}
+.result-card .result-url {
+  color: var(--fg-dim);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
 }
 .result-card .title {
   font-size: 16px;
   font-weight: 500;
   margin-bottom: 6px;
-  color: var(--accent-2);
+  color: var(--accent);
 }
 .result-card .snippet {
   color: var(--fg-dim);

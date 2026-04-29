@@ -1,5 +1,22 @@
 import { useApp } from '../state.js';
 
+function faviconUrl(pageUrl: string): string | null {
+  try {
+    const host = new URL(pageUrl).hostname;
+    return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=32`;
+  } catch {
+    return null;
+  }
+}
+
+function prettyHost(pageUrl: string): string {
+  try {
+    return new URL(pageUrl).hostname.replace(/^www\./, '');
+  } catch {
+    return pageUrl;
+  }
+}
+
 export function WebResultsPane({ tabId }: { tabId: string }): JSX.Element {
   const ui = useApp((s) => s.ui[tabId]);
   const navigate = useApp((s) => s.navigateUrl);
@@ -73,7 +90,13 @@ export function WebResultsPane({ tabId }: { tabId: string }): JSX.Element {
               }
             }}
           >
-            <div className="url">{r.url}</div>
+            <div className="result-meta">
+              {faviconUrl(r.url) ? (
+                <img className="result-favicon" src={faviconUrl(r.url)!} alt="" loading="lazy" />
+              ) : null}
+              <span className="result-host">{prettyHost(r.url)}</span>
+              <span className="result-url">{r.url}</span>
+            </div>
             <div className="title">{r.title}</div>
             {r.snippet ? <div className="snippet">{r.snippet}</div> : null}
           </div>

@@ -72,6 +72,7 @@ export function TabStrip(): JSX.Element {
 
   return (
     <div className="tabstrip">
+      <div className="tabstrip-scroll">
       {ordered.map((t) => {
         const isActive = t.id === activeId && !showSettings;
         const display = t.title || t.url || (t.mode === 'ai' ? 'New AI chat' : 'New tab');
@@ -141,17 +142,21 @@ export function TabStrip(): JSX.Element {
           items={tabMenuItems(menu.tabId, tabs, closeTab)}
         />
       )}
-      <button className="new-tab" onClick={() => void newTab()} aria-label="New tab">
-        +
-      </button>
-      <div className="toolbar-spacer" />
-      <button
-        className="settings-btn"
-        onClick={() => toggleSettings()}
-        aria-pressed={showSettings}
-      >
-        ⚙ Settings
-      </button>
+      </div>
+      {/* Actions pinned outside the scrolling area so they're always visible
+          even with many tabs open. */}
+      <div className="tabstrip-actions">
+        <button className="new-tab" onClick={() => void newTab()} aria-label="New tab">
+          +
+        </button>
+        <button
+          className="settings-btn"
+          onClick={() => toggleSettings()}
+          aria-pressed={showSettings}
+        >
+          ⚙ Settings
+        </button>
+      </div>
     </div>
   );
 }
